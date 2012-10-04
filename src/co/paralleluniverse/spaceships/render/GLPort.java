@@ -48,18 +48,18 @@ public class GLPort implements GLEventListener {
         window.setVisible(true);
         window.setTitle("Spaceships");
 
+        final FPSAnimator animator = new FPSAnimator(window, 60);
+
         window.addWindowListener(new WindowAdapter() {
             @Override
             public void windowDestroyNotify(WindowEvent arg0) {
+                animator.stop();
                 System.exit(0);
             }
         });
         
         window.addGLEventListener(this);
-
         
-        FPSAnimator animator = new FPSAnimator(window, 60);
-        animator.add(window);
         animator.start();
     }
 
