@@ -32,19 +32,21 @@ public class Spaceships {
         System.out.println("VERSION: " + System.getProperty("java.version"));
         System.out.println();
 
-        // GLPort port = new GLPort();
+        GLPort port = new GLPort();
 
-        Properties props = new Properties();
-        props.load(new FileReader("spaceships.properties"));
+        if (false) {
+            Properties props = new Properties();
+            props.load(new FileReader("spaceships.properties"));
 
-        System.out.println("MARKER: " + props.getProperty("MARKER"));
+            System.out.println("MARKER: " + props.getProperty("MARKER"));
 
-        System.out.println("Initializing...");
-        final Spaceships spaceships = new Spaceships(props);
-        System.out.println("Running...");
-        spaceships.run();
-
-        Thread.sleep(Long.MAX_VALUE);
+            System.out.println("Initializing...");
+            final Spaceships spaceships = new Spaceships(props);
+            System.out.println("Running...");
+            spaceships.run();
+            Thread.sleep(Long.MAX_VALUE);
+        }
+        
     }
 
     private final int N;
@@ -68,7 +70,6 @@ public class Spaceships {
 
         final int numThreads = Integer.parseInt(props.getProperty("io-threads", "2"));
         this.executor = new ThreadPoolExecutor(numThreads, numThreads, 0L, TimeUnit.MILLISECONDS, new SynchronousQueue<Runnable>(), new RejectedExecutionHandler() {
-
             @Override
             public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
                 try {
@@ -77,8 +78,9 @@ public class Spaceships {
                     throw new RuntimeException(ex);
                 }
             }
+
         });
-        
+
         this.random = new RandSpatial();
 
         this.ships = new Spaceship[N];
@@ -97,7 +99,7 @@ public class Spaceships {
         final boolean compressed = Boolean.parseBoolean(props.getProperty("compressed", "false"));
         final boolean singlePrecision = Boolean.parseBoolean(props.getProperty("single-precision", "false"));
         final int nodeWidth = Integer.parseInt(props.getProperty("node-width", "10"));
-        
+
         System.out.println("Parallel: " + parallel);
         System.out.println("Parallelism: " + parallelism);
         System.out.println("Optimistic: " + optimistic);
@@ -130,7 +132,7 @@ public class Spaceships {
     }
 
     private void run() {
-       {
+        {
             System.out.println("Inserting " + N + " spaceships");
             long start = System.nanoTime();
             for (int i = 0; i < N; i++) {
