@@ -5,6 +5,7 @@
 package co.paralleluniverse.spaceships.render;
 
 import com.jogamp.opengl.util.glsl.ShaderProgram;
+import java.nio.DoubleBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.BitSet;
@@ -55,9 +56,33 @@ public class ProgramState {
     public void setUniform(GL3 gl, String attributeName, int value) {
         gl.glUniform1i(getLocation(gl, attributeName), value);
     }
+        
+    public void setUniform(GL3 gl, String attributeName, int v0, int v1) {
+        gl.glUniform2i(getLocation(gl, attributeName), v0, v1);
+    }
+    
+    public void setUniform(GL3 gl, String attributeName, int v0, int v1, int v2) {
+        gl.glUniform3i(getLocation(gl, attributeName), v0, v1, v2);
+    }
+    
+    public void setUniform(GL3 gl, String attributeName, int v0, int v1, int v2, int v3) {
+        gl.glUniform4i(getLocation(gl, attributeName), v0, v1, v2, v3);
+    }
     
     public void setUniform(GL3 gl, String attributeName, float value) {
         gl.glUniform1f(getLocation(gl, attributeName), value);
+    }
+    
+    public void setUniform(GL3 gl, String attributeName, float v0, float v1) {
+        gl.glUniform2f(getLocation(gl, attributeName), v0, v1);
+    }
+    
+    public void setUniform(GL3 gl, String attributeName, float v0, float v1, float v2) {
+        gl.glUniform3f(getLocation(gl, attributeName), v0, v1, v2);
+    }
+    
+    public void setUniform(GL3 gl, String attributeName, float v0, float v1, float v2, float v3) {
+        gl.glUniform4f(getLocation(gl, attributeName), v0, v1, v2, v3);
     }
     
     public void setUniform(GL3 gl, String attributeName, int components, IntBuffer buffer) {
@@ -72,7 +97,7 @@ public class ProgramState {
                 throw new GLException("glUniform vector only available for 1iv 2iv, 3iv and 4iv");
         }
     }
-    
+
     public void setUniform(GL3 gl, String attributeName, int components, FloatBuffer buffer) {
         final int location = getLocation(gl, attributeName);
         final int elements = buffer.remaining()/components;
@@ -102,14 +127,25 @@ public class ProgramState {
         vbo.bind(gl);
         final int location = getLocation(gl, attributeName);
         gl.glEnableVertexAttribArray(location);
-        gl.glVertexAttribPointer(location, vbo.getComponents(), vbo.getComponentType(), vbo.isNormalized(), vbo.getStride(), 0);
+        if(vbo.getBuffer() instanceof FloatBuffer)
+            gl.glVertexAttribPointer(location, vbo.getComponents(), vbo.getComponentType(), vbo.isNormalized(), vbo.getStride(), 0);
+        else if(vbo.getBuffer() instanceof IntBuffer)
+            gl.glVertexAttribIPointer(location, vbo.getComponents(), vbo.getComponentType(), vbo.getStride(), 0);
+        if(vbo.getBuffer() instanceof DoubleBuffer)
+            gl.glVertexAttribLPointer(location, vbo.getComponents(), vbo.getComponentType(), vbo.getStride(), 0);
+        else
+            throw new GLException("Unrecognized buffer type: " + vbo.getBuffer().getClass().getName());
         vertexAttributes.set(location);
     }
     
     public void destroy(GL3 gl) {
         for (int i = vertexAttributes.nextSetBit(0); i >= 0; i = vertexAttributes.nextSetBit(i+1))
             gl.glDisableVertexAttribArray(i);
+        
         shader.useProgram(gl, false);
+        gl.glBindVertexArray(0);
+        gl.glDeleteVertexArrays(1, new int[]{vao}, 0);
+        
         shader.release(gl, true);
     }
 }
