@@ -8,10 +8,8 @@ import com.jogamp.newt.event.WindowAdapter;
 import com.jogamp.newt.event.WindowEvent;
 import com.jogamp.newt.opengl.GLWindow;
 import com.jogamp.opengl.util.FPSAnimator;
-import com.jogamp.opengl.util.GLArrayDataServer;
 import com.jogamp.opengl.util.glsl.ShaderCode;
 import com.jogamp.opengl.util.glsl.ShaderProgram;
-import com.jogamp.opengl.util.glsl.ShaderState;
 import java.nio.FloatBuffer;
 import javax.media.opengl.DebugGL3;
 import javax.media.opengl.GL2ES2;
@@ -22,7 +20,6 @@ import javax.media.opengl.GLCapabilitiesImmutable;
 import javax.media.opengl.GLEventListener;
 import javax.media.opengl.GLException;
 import javax.media.opengl.GLProfile;
-import javax.media.opengl.TraceGL3;
 
 /**
  *
@@ -59,13 +56,15 @@ public class GLPort implements GLEventListener {
         });
 
         window.addGLEventListener(this);
+        //window.addKeyListener(this);
 
         animator.start();
     }
 
     @Override
     public void init(GLAutoDrawable drawable) {
-        drawable.setGL(new TraceGL3(new DebugGL3(drawable.getGL().getGL3()), System.err));
+        drawable.setGL(new DebugGL3(drawable.getGL().getGL3()));
+        //drawable.setGL(new TraceGL3(new DebugGL3(drawable.getGL().getGL3()), System.err));
 
         final GL3 gl = drawable.getGL().getGL3();
 
@@ -90,7 +89,6 @@ public class GLPort implements GLEventListener {
 
         this.shaderState = new ProgramState(gl, shaderProgram);
         shaderState.bind(gl);
-
         
         this.vertices = new VBO(gl, 2, gl.GL_FLOAT, false, 3, gl.GL_STATIC_DRAW);
         {
@@ -102,28 +100,16 @@ public class GLPort implements GLEventListener {
         vertices.write(gl);
 
         shaderState.setVertex(gl, "in_Position", vertices);
-        
-
-        VBO colors = new VBO(gl,  4, gl.GL_FLOAT, false, 3, gl.GL_STATIC_DRAW);
-        {
-            FloatBuffer colorb = (FloatBuffer)colors.getBuffer();
-            colorb.put( 1);    colorb.put( 0);     colorb.put( 0);    colorb.put( 1);
-            colorb.put( 0);    colorb.put( 1);     colorb.put( 0);    colorb.put( 1);
-            colorb.put( 0);    colorb.put( 0);     colorb.put( 1);    colorb.put( 1);
-        }
-        colors.write(gl);
-
-        shaderState.setVertex(gl, "in_Color", colors);
 
         shaderState.unbind(gl);
-        System.err.println(Thread.currentThread() + " " + shaderState);
     }
 
     @Override
     public void dispose(GLAutoDrawable drawable) {
         final GL3 gl = drawable.getGL().getGL3();
         
-        //shaderState.destroy(gl);
+        shaderState.destroy(gl);
+        vertices.destroy(gl);
     }
 
     @Override

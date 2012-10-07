@@ -103,4 +103,10 @@ public class ProgramState {
         gl.glEnableVertexAttribArray(location);
         gl.glVertexAttribPointer(location, vbo.getComponents(), vbo.getComponentType(), vbo.isNormalized(), vbo.getStride(), 0);
     }
+    
+    public void destroy(GL3 gl) {
+        for(int location : attributes.values())
+            gl.glDisableVertexAttribArray(location);
+        shader.release(gl, true);
+    }
 }

@@ -2,11 +2,9 @@
 
 in vec2 in_Position;
 in vec3 in_Color;
-out vec3 pass_Color;
 
 void main()
 {
     gl_Position.xy = in_Position;
-    pass_Color = in_Color;
-    gl_PointSize = 100;
+    gl_PointSize = 20;
 }
