@@ -50,6 +50,14 @@ public class Spaceship {
         aabb.max(Y, y);
     }
 
+    public double getX() {
+        return x;
+    }
+
+    public double getY() {
+        return y;
+    }
+
     public SpatialToken getToken() {
         return token;
     }
@@ -59,27 +67,29 @@ public class Spaceship {
     }
 
     public void run(final Spaceships global) {
-        global.sb.query(SpatialQueries.range(getAABB(), global.range), new SpatialSetVisitor<Spaceship>() {
-            @Override
-            public void visit(Set<Spaceship> result) {
-                System.out.println("Seeing " + result.size());
-
-                try {
-                    System.out.println("Before: " + x + ", " + y + " AABB: " + global.sb.getElement(token).getBounds());
-                    System.out.println("Velocity: " + vx + ", " + vy);
-                    move(global);
-                    global.sb.update(token, getAABB());
-                    System.out.println("After: " + x + ", " + y + " AABB: " + global.sb.getElement(token).getBounds());
-                } catch (Exception e) {
-                    System.err.println("Exc:" + e.getMessage());
-                    e.printStackTrace();
-                } finally {
-                    System.out.println("done");
+        try {
+            global.sb.query(SpatialQueries.range(getAABB(), global.range), new SpatialSetVisitor<Spaceship>() {
+                @Override
+                public void visit(Set<Spaceship> result) {
+                    //System.out.println("Seeing " + result.size());
                 }
 
+            }).join();
+            try {
+                //System.out.println("Before: " + x + ", " + y + " AABB: " + global.sb.getElement(token).getBounds());
+                //System.out.println("Velocity: " + vx + ", " + vy);
+                move(global);
+                global.sb.update(token, getAABB());
+                //System.out.println("After: " + x + ", " + y + " AABB: " + global.sb.getElement(token).getBounds());
+            } catch (Exception e) {
+                //System.err.println("Exc:" + e.getMessage());
+                e.printStackTrace();
+            } finally {
+                //System.out.println("done");
             }
-
-        });
+        } catch (InterruptedException ex) {
+            throw new RuntimeException(ex);
+        }
     }
 
     private void setVelocityDir(double direction, double speed) {

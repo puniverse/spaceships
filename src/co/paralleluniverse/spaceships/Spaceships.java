@@ -32,21 +32,16 @@ public class Spaceships {
         System.out.println("VERSION: " + System.getProperty("java.version"));
         System.out.println();
 
-        GLPort port = new GLPort();
+        Properties props = new Properties();
+        props.load(new FileReader("spaceships.properties"));
 
-        if (false) {
-            Properties props = new Properties();
-            props.load(new FileReader("spaceships.properties"));
+        System.out.println("MARKER: " + props.getProperty("MARKER"));
 
-            System.out.println("MARKER: " + props.getProperty("MARKER"));
-
-            System.out.println("Initializing...");
-            final Spaceships spaceships = new Spaceships(props);
-            System.out.println("Running...");
-            spaceships.run();
-            Thread.sleep(Long.MAX_VALUE);
-        }
-        
+        System.out.println("Initializing...");
+        final Spaceships spaceships = new Spaceships(props);
+        System.out.println("Running...");
+        spaceships.run();
+        Thread.sleep(Long.MAX_VALUE);
     }
 
     private final int N;
@@ -88,6 +83,7 @@ public class Spaceships {
             ships[i] = new Spaceship(this);
 
         this.sb = initSpaceBase(props);
+
     }
 
     private SpaceBase<Spaceship> initSpaceBase(Properties props) {
@@ -143,6 +139,8 @@ public class Spaceships {
             }
             System.out.println("Inserted " + N + " things in " + millis(start));
         }
+
+        GLPort port = new GLPort(N, sb);
 
         for (;;) {
             long start = System.nanoTime();

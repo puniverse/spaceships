@@ -25,7 +25,7 @@ public class VBO {
     private final int componentType;
     private final boolean normalized;
     private final int stride;
-    private boolean written;
+    //private boolean written;
 
     /**
      * Create a VBO, using a custom GLSL array attribute name and starting with a new created Buffer object with
@@ -82,12 +82,16 @@ public class VBO {
         this.stride = components * componentByteSize;
 
         this.buffer = GLBuffers.newDirectGLBuffer(componentType, components * numElements);
-
+        buffer.limit(buffer.capacity());
+        
         int[] tmp = new int[1];
         gl.glGenBuffers(1, tmp, 0);
         this.vbo = tmp[0];
+        
+        bind(gl);
+        gl.glBufferData(vboTarget, stride*numElements, null, usage);
 
-        this.written = false;
+        //this.written = false;
     }
 
     public Buffer getBuffer() {
@@ -117,19 +121,19 @@ public class VBO {
     public void write(GL gl) {
         bind(gl);
 
-        buffer.flip();
-        if (!written) {
-            gl.glBufferData(vboTarget, buffer.remaining() * GLBuffers.sizeOfGLType(componentType), buffer, usage);
-            written = true;
-        } else {
+        buffer.rewind();
+//        if (!written) {
+//            gl.glBufferData(vboTarget, buffer.remaining() * GLBuffers.sizeOfGLType(componentType), buffer, usage);
+//            written = true;
+//        } else
             gl.glBufferSubData(vboTarget, 0, buffer.remaining() * GLBuffers.sizeOfGLType(componentType), buffer);
-        }
+        
     }
 
     public void write(GL gl, int offset, int elements) {
         bind(gl);
-        if (!written)
-            throw new RuntimeException("VBO must be written once using write() before calling this method");
+//        if (!written)
+//            throw new RuntimeException("VBO must be written once using write() before calling this method");
 
         gl.glBufferSubData(vboTarget, offset * stride, elements * stride, Buffers.slice(buffer, offset * components, elements * components));
                 //slice(offset, elements));
@@ -142,6 +146,10 @@ public class VBO {
 
     public void rewind() {
         buffer.rewind();
+    }
+
+    public void flip() {
+        buffer.flip();
     }
 
     public void position(int position) {
