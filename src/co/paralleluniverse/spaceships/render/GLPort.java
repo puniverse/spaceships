@@ -30,10 +30,10 @@ import javax.media.opengl.TraceGL3;
  */
 public class GLPort implements GLEventListener {
 
-    private ShaderProgram shaderProgram;
-    private ShaderState shaderState;
-    private int vao;
-
+    private ProgramState shaderState;
+    private VBO vertices;
+    private float x = 1.0f;
+    
     static {
         GLProfile.initSingleton();
     }
@@ -69,7 +69,10 @@ public class GLPort implements GLEventListener {
 
         final GL3 gl = drawable.getGL().getGL3();
 
+        gl.glEnable(gl.GL_VERTEX_PROGRAM_POINT_SIZE);
         gl.glViewport(0, 0, 300, 300);
+        gl.glClearColor(0, 0, 0, 1);
+
 
         ShaderCode vertexShader = ShaderCode.create(gl, gl.GL_VERTEX_SHADER, this.getClass(), "shader", null, "vertex", false);
         ShaderCode fragmentShader = ShaderCode.create(gl, gl.GL_FRAGMENT_SHADER, this.getClass(), "shader", null, "fragment", false);
@@ -79,71 +82,70 @@ public class GLPort implements GLEventListener {
         if (!fragmentShader.compile(gl, System.err))
             throw new GLException("Couldn't compile shader: " + fragmentShader);
 
-        this.shaderProgram = new ShaderProgram();
+        final ShaderProgram shaderProgram = new ShaderProgram();
         shaderProgram.add(gl, vertexShader, System.err);
         shaderProgram.add(gl, fragmentShader, System.err);
         if (!shaderProgram.link(gl, System.err))
             throw new GLException("Couldn't link program: " + shaderProgram);
 
-        this.shaderState = new ShaderState();
-        shaderState.attachShaderProgram(gl, shaderProgram, true);
-        shaderState.useProgram(gl, true);
+        this.shaderState = new ProgramState(gl, shaderProgram);
+        shaderState.bind(gl);
 
-        int[] vao1 = new int[1];
-        gl.glGenVertexArrays(1, vao1, 0);
-        this.vao = vao1[0];
-        gl.glBindVertexArray(vao);
-
-        GLArrayDataServer vertices = GLArrayDataServer.createGLSL("in_Position", 3, gl.GL_FLOAT, false, 3, gl.GL_STATIC_DRAW);
+        
+        this.vertices = new VBO(gl, 2, gl.GL_FLOAT, false, 3, gl.GL_STATIC_DRAW);
         {
             FloatBuffer verticeb = (FloatBuffer) vertices.getBuffer();
-            verticeb.put(-1.0f);
-            verticeb.put(-1.0f);
-            verticeb.put(0);
-            verticeb.put(1.0f);
-            verticeb.put(-1.0f);
-            verticeb.put(0);
-            verticeb.put(0);
-            verticeb.put(1.0f);
-            verticeb.put(0);
+            verticeb.put(-1.0f); verticeb.put(-1.0f);
+            verticeb.put(1.0f);  verticeb.put(-1.0f);
+            verticeb.put(0); verticeb.put(1.0f);
         }
-        vertices.seal(gl, true);
+        vertices.write(gl);
 
-        GLArrayDataServer colors = GLArrayDataServer.createGLSL("in_Color",  4, gl.GL_FLOAT, false, 3, gl.GL_STATIC_DRAW);
-        colors.setName("in_Color");
+        shaderState.setVertex(gl, "in_Position", vertices);
+        
+
+        VBO colors = new VBO(gl,  4, gl.GL_FLOAT, false, 3, gl.GL_STATIC_DRAW);
         {
             FloatBuffer colorb = (FloatBuffer)colors.getBuffer();
             colorb.put( 1);    colorb.put( 0);     colorb.put( 0);    colorb.put( 1);
             colorb.put( 0);    colorb.put( 1);     colorb.put( 0);    colorb.put( 1);
             colorb.put( 0);    colorb.put( 0);     colorb.put( 1);    colorb.put( 1);
         }
-        colors.seal(gl, true);
+        colors.write(gl);
 
-        gl.glBindVertexArray(0);
-        gl.glClearColor(0, 0, 0, 1);
+        shaderState.setVertex(gl, "in_Color", colors);
 
-        shaderState.useProgram(gl, false);
+        shaderState.unbind(gl);
         System.err.println(Thread.currentThread() + " " + shaderState);
     }
 
     @Override
     public void dispose(GLAutoDrawable drawable) {
         final GL3 gl = drawable.getGL().getGL3();
-        shaderState.destroy(gl);
+        
+        //shaderState.destroy(gl);
     }
 
     @Override
     public void display(GLAutoDrawable drawable) {
         final GL3 gl = drawable.getGL().getGL3();
 
-        shaderState.useProgram(gl, true);
-        gl.glBindVertexArray(vao);
+        x -= 0.001f;
+        
+        shaderState.bind(gl);
 
+        vertices.position(2);
+        {
+            final FloatBuffer verticeb = (FloatBuffer) vertices.getBuffer();
+            verticeb.put(0); verticeb.put(x);
+        }
+        vertices.rewind();
+        vertices.write(gl, 2, 1);
+        
         gl.glClear(gl.GL_COLOR_BUFFER_BIT);
-        gl.glDrawArrays(gl.GL_TRIANGLES, 0, 3);
+        gl.glDrawArrays(gl.GL_POINTS, 0, 3);
 
-        gl.glBindVertexArray(0);
-        shaderState.useProgram(gl, false);
+        shaderState.unbind(gl);
     }
 
     @Override
