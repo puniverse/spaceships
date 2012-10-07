@@ -4,6 +4,8 @@
  */
 package co.paralleluniverse.spaceships.render;
 
+import com.jogamp.newt.event.KeyEvent;
+import com.jogamp.newt.event.KeyListener;
 import com.jogamp.newt.event.WindowAdapter;
 import com.jogamp.newt.event.WindowEvent;
 import com.jogamp.newt.opengl.GLWindow;
@@ -25,7 +27,7 @@ import javax.media.opengl.GLProfile;
  *
  * @author pron
  */
-public class GLPort implements GLEventListener {
+public class GLPort implements GLEventListener, KeyListener {
 
     private ProgramState shaderState;
     private VBO vertices;
@@ -56,7 +58,7 @@ public class GLPort implements GLEventListener {
         });
 
         window.addGLEventListener(this);
-        //window.addKeyListener(this);
+        window.addKeyListener(this);
 
         animator.start();
     }
@@ -108,6 +110,7 @@ public class GLPort implements GLEventListener {
     public void dispose(GLAutoDrawable drawable) {
         final GL3 gl = drawable.getGL().getGL3();
         
+        shaderState.bind(gl);
         shaderState.destroy(gl);
         vertices.destroy(gl);
     }
@@ -140,5 +143,22 @@ public class GLPort implements GLEventListener {
 
         gl.glViewport(0, 0, width, height);
     }
+
+    @Override
+    public void keyPressed(KeyEvent e) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public void keyReleased(KeyEvent e) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public void keyTyped(KeyEvent e) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+    
+    
 
 }

@@ -5,9 +5,9 @@
 package co.paralleluniverse.spaceships.render;
 
 import com.jogamp.opengl.util.glsl.ShaderProgram;
-import java.nio.Buffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
+import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -23,6 +23,7 @@ public class ProgramState {
     private final ShaderProgram shader;
     private final int vao;
     private final Map<String, Integer> attributes = Collections.synchronizedMap(new HashMap<String, Integer>());
+    private final BitSet vertexAttributes = new BitSet();
 
     public ProgramState(GL3 gl, ShaderProgram shader) {
         this.shader = shader;
@@ -102,11 +103,13 @@ public class ProgramState {
         final int location = getLocation(gl, attributeName);
         gl.glEnableVertexAttribArray(location);
         gl.glVertexAttribPointer(location, vbo.getComponents(), vbo.getComponentType(), vbo.isNormalized(), vbo.getStride(), 0);
+        vertexAttributes.set(location);
     }
     
     public void destroy(GL3 gl) {
-        for(int location : attributes.values())
-            gl.glDisableVertexAttribArray(location);
+        for (int i = vertexAttributes.nextSetBit(0); i >= 0; i = vertexAttributes.nextSetBit(i+1))
+            gl.glDisableVertexAttribArray(i);
+        shader.useProgram(gl, false);
         shader.release(gl, true);
     }
 }
