@@ -156,11 +156,11 @@ public class GLPort implements GLEventListener, KeyListener {
 
             vertices.rewind();
             final FloatBuffer verticeb = (FloatBuffer) vertices.getBuffer();
-            System.out.println("XXX " + verticeb + " " + port);
+            //System.out.println("XXX " + verticeb + " " + port);
             sb.query(SpatialQueries.contained(port), new SpatialSetVisitor<Spaceship>() {
                 @Override
                 public void visit(Set<Spaceship> result) {
-                    System.out.println("Seeing " + result.size());
+                    //System.out.println("Seeing " + result.size());
                     for (Spaceship s : result) {
                         verticeb.put((float) s.getX());
                         verticeb.put((float) s.getY());
