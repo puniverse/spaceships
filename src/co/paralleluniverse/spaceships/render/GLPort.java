@@ -31,7 +31,7 @@ import javax.media.opengl.fixedfunc.GLMatrixFunc;
  * @author pron
  */
 public class GLPort implements GLEventListener, KeyListener {
-
+    private static final float KEY_PRESS_TRANSLATE = 10.0f;
     private ProgramState shaderState;
     private VAO vao;
     private VBO vertices;
@@ -70,8 +70,8 @@ public class GLPort implements GLEventListener, KeyListener {
 
     @Override
     public void init(GLAutoDrawable drawable) {
-        //drawable.setGL(new DebugGL3(drawable.getGL().getGL3()));
-        drawable.setGL(new TraceGL3(new DebugGL3(drawable.getGL().getGL3()), System.err));
+        drawable.setGL(new DebugGL3(drawable.getGL().getGL3()));
+        //drawable.setGL(new TraceGL3(new DebugGL3(drawable.getGL().getGL3()), System.err));
 
         final GL3 gl = drawable.getGL().getGL3();
 
@@ -99,12 +99,9 @@ public class GLPort implements GLEventListener, KeyListener {
 
         pmv.glMatrixMode(GLMatrixFunc.GL_MODELVIEW);
         pmv.glLoadIdentity();
+        pmv.glScalef(1.0f/(float)drawable.getWidth(), 1.0f/(float)drawable.getHeight(), 1);
         pmv.glMatrixMode(GLMatrixFunc.GL_PROJECTION);
         pmv.glLoadIdentity();
-        //pmv.glScalef((float)drawable.getWidth(), (float)drawable.getHeight(), 1);
-        pmv.glScalef(0.5f, 0.5f, 1.0f);
-
-        print(pmv.glGetPMatrixf());
 
         this.vao = shaderState.createVAO(gl);
         vao.bind(gl);
@@ -112,20 +109,20 @@ public class GLPort implements GLEventListener, KeyListener {
         this.vertices = new VBO(gl, 2, gl.GL_FLOAT, false, 3, gl.GL_STATIC_DRAW);
         {
             FloatBuffer verticeb = (FloatBuffer) vertices.getBuffer();
-            verticeb.put(-1.0f);
-            verticeb.put(-1.0f);
-            verticeb.put(1.0f);
-            verticeb.put(-1.0f);
+            verticeb.put(-50f);
+            verticeb.put(-50f);
+            verticeb.put(50f);
+            verticeb.put(-50f);
             verticeb.put(0);
-            verticeb.put(1.0f);
+            verticeb.put(50f);
         }
         vertices.write(gl);
 
         vao.setVertex(gl, "in_Position", vertices);
 
-        //shaderState.setUniform(gl, "in_Matrix", 4, 4, pmv.glGetPMatrixf());
-        shaderState.createUBO(gl, "MatrixBlock");
-        shaderState.getUBO("MatrixBlock").bind(gl).set(gl, "PMatrix", 4, 4, pmv.glGetPMatrixf());
+        shaderState.setUniform(gl, "in_Matrix", 4, 4, pmv.glGetMvMatrixf());
+        //shaderState.createUBO(gl, "MatrixBlock");
+        //shaderState.getUBO("MatrixBlock").bind(gl).set(gl, "PMatrix", 4, 4, pmv.glGetMvMatrixf());
 
         shaderState.unbind(gl);
     }
@@ -143,8 +140,6 @@ public class GLPort implements GLEventListener, KeyListener {
     public void display(GLAutoDrawable drawable) {
         final GL3 gl = drawable.getGL().getGL3();
 
-        x -= 0.001f;
-
         shaderState.bind(gl);
         vao.bind(gl);
 
@@ -157,8 +152,8 @@ public class GLPort implements GLEventListener, KeyListener {
         vertices.rewind();
         vertices.write(gl, 2, 1);
 
-        //shaderState.setUniform(gl, "in_Matrix", 4, 4, pmv.glGetPMatrixf());
-        //shaderState.getUBO("MatrixBlock").set(gl, "PMatrix", 4, 4, pmv.glGetPMatrixf());
+        shaderState.setUniform(gl, "in_Matrix", 4, 4, pmv.glGetMvMatrixf());
+        //shaderState.getUBO("MatrixBlock").set(gl, "PMatrix", 4, 4, pmv.glGetMvMatrixf());
 
         gl.glClear(gl.GL_COLOR_BUFFER_BIT);
         gl.glDrawArrays(gl.GL_POINTS, 0, 3);
@@ -172,24 +167,36 @@ public class GLPort implements GLEventListener, KeyListener {
         final GL2ES2 gl = drawable.getGL().getGL2ES2();
 
         gl.glViewport(0, 0, width, height);
-        pmv.glMatrixMode(GLMatrixFunc.GL_PROJECTION);
-        //pmv.glScalef((float)width, (float)height, 1);
-        pmv.glScalef(0.5f, 0.5f, 1.0f);
+        pmv.glMatrixMode(GLMatrixFunc.GL_MODELVIEW);
+        pmv.glScalef((float)drawable.getWidth()/(float)width, (float)drawable.getHeight()/(float)height, 1);
     }
 
     @Override
     public void keyPressed(KeyEvent e) {
-        throw new UnsupportedOperationException("Not supported yet.");
+        int keyCode = e.getKeyCode();
+        pmv.glMatrixMode(GLMatrixFunc.GL_MODELVIEW);
+        switch (keyCode) {
+            case KeyEvent.VK_UP:
+                pmv.glTranslatef(0f, -KEY_PRESS_TRANSLATE, 0f);
+                break;
+            case KeyEvent.VK_DOWN:
+                pmv.glTranslatef(0f, KEY_PRESS_TRANSLATE, 0f);
+                break;
+            case KeyEvent.VK_LEFT:
+                pmv.glTranslatef(KEY_PRESS_TRANSLATE, 0f, 0f);
+                break;
+            case KeyEvent.VK_RIGHT:
+                pmv.glTranslatef(-KEY_PRESS_TRANSLATE, 0f, 0f);
+                break;
+        }
     }
 
     @Override
     public void keyReleased(KeyEvent e) {
-        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
     public void keyTyped(KeyEvent e) {
-        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     private void print(FloatBuffer buffer) {

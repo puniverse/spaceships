@@ -1,13 +1,13 @@
 #version 330 core
 
 in vec2 in_Position;
-//uniform mat4 in_Matrix;
-uniform MatrixBlock {
-    uniform mat4 PMatrix;
-};
+uniform mat4 in_Matrix;
+//uniform MatrixBlock {
+//    uniform mat4 PMatrix;
+//};
 
 void main()
 {
-    gl_Position = PMatrix * vec4(in_Position, 1.0, 1.0);
+    gl_Position = in_Matrix * vec4(in_Position, 1.0, 1.0);
     gl_PointSize = 10;
 }
