@@ -25,6 +25,7 @@ public class Spaceship {
     private double y;
     private double vx;
     private double vy;
+    private int neighbors;
     private SpatialToken token;
 
     public Spaceship(Spaceships global) {
@@ -58,6 +59,10 @@ public class Spaceship {
         return y;
     }
 
+    public int getNeighbors() {
+        return neighbors;
+    }
+
     public SpatialToken getToken() {
         return token;
     }
@@ -71,23 +76,21 @@ public class Spaceship {
             global.sb.query(SpatialQueries.range(getAABB(), global.range), new SpatialSetVisitor<Spaceship>() {
                 @Override
                 public void visit(Set<Spaceship> result) {
+                    neighbors = result.size();
                     //System.out.println("Seeing " + result.size());
                 }
 
             }).join();
             try {
-                //System.out.println("Before: " + x + ", " + y + " AABB: " + global.sb.getElement(token).getBounds());
-                //System.out.println("Velocity: " + vx + ", " + vy);
                 move(global);
                 global.sb.update(token, getAABB());
-                //System.out.println("After: " + x + ", " + y + " AABB: " + global.sb.getElement(token).getBounds());
             } catch (Exception e) {
                 //System.err.println("Exc:" + e.getMessage());
                 e.printStackTrace();
             } finally {
                 //System.out.println("done");
             }
-        } catch (InterruptedException ex) {
+        } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
     }

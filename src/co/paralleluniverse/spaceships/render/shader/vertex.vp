@@ -5,9 +5,12 @@ uniform mat4 in_Matrix;
 //uniform MatrixBlock {
 //    uniform mat4 PMatrix;
 //};
+in float in_Color;
+out vec4 pass_Color;
 
 void main()
 {
     gl_Position = in_Matrix * vec4(in_Position, 1.0, 1.0);
     gl_PointSize = 10;
+    pass_Color = vec4(in_Color, 0.0, 0.0, 1.0);
 }

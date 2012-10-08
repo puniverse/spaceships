@@ -13,6 +13,8 @@ import co.paralleluniverse.spacebase.SpatialSetVisitor;
 import co.paralleluniverse.spaceships.Spaceship;
 import com.jogamp.newt.event.KeyEvent;
 import com.jogamp.newt.event.KeyListener;
+import com.jogamp.newt.event.MouseEvent;
+import com.jogamp.newt.event.MouseListener;
 import com.jogamp.newt.event.WindowAdapter;
 import com.jogamp.newt.event.WindowEvent;
 import com.jogamp.newt.opengl.GLWindow;
@@ -38,7 +40,7 @@ import javax.media.opengl.fixedfunc.GLMatrixFunc;
  *
  * @author pron
  */
-public class GLPort implements GLEventListener, KeyListener {
+public class GLPort implements GLEventListener, KeyListener, MouseListener {
 
     private static final float KEY_PRESS_TRANSLATE = 10.0f;
     private final int maxItems;
@@ -47,6 +49,7 @@ public class GLPort implements GLEventListener, KeyListener {
     private ProgramState shaderState;
     private VAO vao;
     private VBO vertices;
+    private VBO colors;
     private PMVMatrix pmv = new PMVMatrix();
     private float x = 1.0f;
 
@@ -79,6 +82,7 @@ public class GLPort implements GLEventListener, KeyListener {
 
         window.addGLEventListener(this);
         window.addKeyListener(this);
+        window.addMouseListener(this);
 
         animator.start();
     }
@@ -115,26 +119,31 @@ public class GLPort implements GLEventListener, KeyListener {
         this.shaderState = new ProgramState(gl, shaderProgram);
         shaderState.bind(gl);
 
-
-        pmv.glMatrixMode(GLMatrixFunc.GL_MODELVIEW);
-        pmv.glLoadIdentity();
-        pmv.glScalef(1.0f / (float) drawable.getWidth(), 1.0f / (float) drawable.getHeight(), 1);
+        portToMvMatrix();
         pmv.glMatrixMode(GLMatrixFunc.GL_PROJECTION);
         pmv.glLoadIdentity();
 
         this.vao = shaderState.createVAO(gl);
         vao.bind(gl);
 
-        this.vertices = new VBO(gl, 2, gl.GL_FLOAT, false, maxItems, gl.GL_STATIC_DRAW);
-        vertices.write(gl);
+        this.vertices = new VBO(gl, 2, gl.GL_FLOAT, false, maxItems, gl.GL_DYNAMIC_DRAW);
+        this.colors = new VBO(gl, 1, gl.GL_FLOAT, false, maxItems, gl.GL_DYNAMIC_DRAW);
 
         vao.setVertex(gl, "in_Position", vertices);
+        vao.setVertex(gl, "in_Color", colors);
 
         shaderState.setUniform(gl, "in_Matrix", 4, 4, pmv.glGetMvMatrixf());
         //shaderState.createUBO(gl, "MatrixBlock");
         //shaderState.getUBO("MatrixBlock").bind(gl).set(gl, "PMatrix", 4, 4, pmv.glGetMvMatrixf());
 
         shaderState.unbind(gl);
+    }
+
+    private void portToMvMatrix() {
+        pmv.glMatrixMode(GLMatrixFunc.GL_MODELVIEW);
+        pmv.glLoadIdentity();
+        pmv.glScalef((float) (2.0 / (port.max(X) - port.min(X))), (float) (2.0 / (port.max(Y) - port.min(Y))), 1.0f);
+        pmv.glTranslatef((float) (-(port.max(X) + port.min(X)) / 2.0), (float) (-(port.max(Y) + port.min(Y)) / 2.0), 0f);
     }
 
     @Override
@@ -155,24 +164,30 @@ public class GLPort implements GLEventListener, KeyListener {
             vao.bind(gl);
 
             vertices.rewind();
-            final FloatBuffer verticeb = (FloatBuffer) vertices.getBuffer();
+            colors.rewind();
+            final FloatBuffer verticesb = (FloatBuffer) vertices.getBuffer();
+            final FloatBuffer colorsb = (FloatBuffer) colors.getBuffer();
             //System.out.println("XXX " + verticeb + " " + port);
             sb.query(SpatialQueries.contained(port), new SpatialSetVisitor<Spaceship>() {
                 @Override
                 public void visit(Set<Spaceship> result) {
-                    //System.out.println("Seeing " + result.size());
+                    // System.out.println("Seeing " + result.size());
                     for (Spaceship s : result) {
-                        verticeb.put((float) s.getX());
-                        verticeb.put((float) s.getY());
+                        verticesb.put((float) s.getX());
+                        verticesb.put((float) s.getY());
+                        
+                        colorsb.put(Math.min(1.0f, 0.3f + (float)s.getNeighbors() / 5.0f));
                     }
                 }
 
             }).join();
 
             vertices.rewind();
+            colors.rewind();
 
-            int numElems = verticeb.limit() / 2;
+            int numElems = verticesb.limit() / 2;
             vertices.write(gl, 0, numElems);
+            colors.write(gl, 0, numElems);
 
             shaderState.setUniform(gl, "in_Matrix", 4, 4, pmv.glGetMvMatrixf());
             //shaderState.getUBO("MatrixBlock").set(gl, "PMatrix", 4, 4, pmv.glGetMvMatrixf());
@@ -192,40 +207,53 @@ public class GLPort implements GLEventListener, KeyListener {
         final GL2ES2 gl = drawable.getGL().getGL2ES2();
 
         gl.glViewport(0, 0, width, height);
-        pmv.glMatrixMode(GLMatrixFunc.GL_MODELVIEW);
-        pmv.glScalef((float) drawable.getWidth() / (float) width, (float) drawable.getHeight() / (float) height, 1);
+        port.max(X, port.min(X) + width);
+        port.max(Y, port.min(Y) + height);
+        portToMvMatrix();
+    }
+
+    private void movePort(boolean horizontal, int units) {
+        //pmv.glMatrixMode(GLMatrixFunc.GL_MODELVIEW);
+        if (horizontal) {
+            //pmv.glTranslatef(-units * KEY_PRESS_TRANSLATE, 0f, 0f);
+            port.min(X, port.min(X) + units * KEY_PRESS_TRANSLATE);
+            port.max(X, port.max(X) + units * KEY_PRESS_TRANSLATE);
+            portToMvMatrix();
+        } else {
+            //pmv.glTranslatef(0f, -units * KEY_PRESS_TRANSLATE, 0f);
+            port.min(Y, port.min(Y) + units * KEY_PRESS_TRANSLATE);
+            port.max(Y, port.max(Y) + units * KEY_PRESS_TRANSLATE);
+            portToMvMatrix();
+        }
     }
 
     @Override
     public void keyPressed(KeyEvent e) {
         int keyCode = e.getKeyCode();
-        pmv.glMatrixMode(GLMatrixFunc.GL_MODELVIEW);
         switch (keyCode) {
             case KeyEvent.VK_UP:
-                pmv.glTranslatef(0f, -KEY_PRESS_TRANSLATE, 0f);
-                port.min(Y, port.min(Y) + KEY_PRESS_TRANSLATE);
+                movePort(false, 1);
                 break;
             case KeyEvent.VK_DOWN:
-                pmv.glTranslatef(0f, KEY_PRESS_TRANSLATE, 0f);
-                port.min(Y, port.min(Y) - KEY_PRESS_TRANSLATE);
+                movePort(false, -1);
                 break;
             case KeyEvent.VK_LEFT:
-                pmv.glTranslatef(KEY_PRESS_TRANSLATE, 0f, 0f);
-                port.min(X, port.min(X) - KEY_PRESS_TRANSLATE);
+                movePort(true, -1);
                 break;
             case KeyEvent.VK_RIGHT:
-                pmv.glTranslatef(-KEY_PRESS_TRANSLATE, 0f, 0f);
-                port.min(X, port.min(X) + KEY_PRESS_TRANSLATE);
+                movePort(true, 1);
                 break;
         }
     }
 
     @Override
-    public void keyReleased(KeyEvent e) {
-    }
-
-    @Override
-    public void keyTyped(KeyEvent e) {
+    public void mouseWheelMoved(MouseEvent e) {
+        movePort(e.isShiftDown(), e.getWheelRotation());
+//        if(e.isShiftDown()) {
+//            movePort(true, e.getWheelRotation());
+//        } else {
+//            
+//        }
     }
 
     private void print(FloatBuffer buffer) {
@@ -235,6 +263,42 @@ public class GLPort implements GLEventListener, KeyListener {
             System.err.print(buffer.get() + ", ");
         System.err.println();
         buffer.position(pos);
+    }
+
+    @Override
+    public void mouseClicked(MouseEvent e) {
+    }
+
+    @Override
+    public void mouseEntered(MouseEvent e) {
+    }
+
+    @Override
+    public void mouseExited(MouseEvent e) {
+    }
+
+    @Override
+    public void mousePressed(MouseEvent e) {
+    }
+
+    @Override
+    public void mouseReleased(MouseEvent e) {
+    }
+
+    @Override
+    public void mouseMoved(MouseEvent e) {
+    }
+
+    @Override
+    public void mouseDragged(MouseEvent e) {
+    }
+
+    @Override
+    public void keyReleased(KeyEvent e) {
+    }
+
+    @Override
+    public void keyTyped(KeyEvent e) {
     }
 
 }

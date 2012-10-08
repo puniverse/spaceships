@@ -58,7 +58,7 @@ public class Spaceships {
     public Spaceships(Properties props) {
         this.dim = 2;
         this.async = Boolean.parseBoolean(props.getProperty("async", "true"));
-        this.bounds = createDimAABB(-150, 150, -150, 150, -150, 150);
+        this.bounds = createDimAABB(-10000, 10000, -10000, 10000, -10000, 10000);
         this.N = Integer.parseInt(props.getProperty("N", "10000"));
         this.speedVariance = Double.parseDouble(props.getProperty("speed-variance", "1"));
         this.range = Double.parseDouble(props.getProperty("radar-range", "10"));
@@ -155,7 +155,7 @@ public class Spaceships {
 
                 });
             }
-            millis(start);
+            System.out.println("XXX: " + millis(start));
         }
     }
 
