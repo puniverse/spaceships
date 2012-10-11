@@ -4,6 +4,7 @@
  */
 package co.paralleluniverse.spaceships.render;
 
+import co.paralleluniverse.spacebase.AABB;
 import static co.paralleluniverse.spacebase.AABB.X;
 import static co.paralleluniverse.spacebase.AABB.Y;
 import co.paralleluniverse.spacebase.MutableAABB;
@@ -45,6 +46,7 @@ public class GLPort implements GLEventListener, KeyListener, MouseListener {
     private static final float KEY_PRESS_TRANSLATE = 10.0f;
     private final int maxItems;
     private final SpaceBase<Spaceship> sb;
+    private final AABB bounds;
     private final MutableAABB port = MutableAABB.create(2);
     private ProgramState shaderState;
     private VAO vao;
@@ -57,9 +59,10 @@ public class GLPort implements GLEventListener, KeyListener, MouseListener {
         GLProfile.initSingleton();
     }
 
-    public GLPort(int maxItems, SpaceBase<Spaceship> sb) {
+    public GLPort(int maxItems, SpaceBase<Spaceship> sb, AABB bounds) {
         this.maxItems = maxItems;
         this.sb = sb;
+        this.bounds = bounds;
 
         final GLProfile glp = GLProfile.get(GLProfile.GL3);
         final GLCapabilitiesImmutable glcaps = (GLCapabilitiesImmutable) new GLCapabilities(glp);
@@ -175,8 +178,8 @@ public class GLPort implements GLEventListener, KeyListener, MouseListener {
                     for (Spaceship s : result) {
                         verticesb.put((float) s.getX());
                         verticesb.put((float) s.getY());
-                        
-                        colorsb.put(Math.min(1.0f, 0.3f + (float)s.getNeighbors() / 5.0f));
+
+                        colorsb.put(Math.min(1.0f, 0.3f + (float) s.getNeighbors() / 5.0f));
                     }
                 }
 
@@ -214,17 +217,35 @@ public class GLPort implements GLEventListener, KeyListener, MouseListener {
 
     private void movePort(boolean horizontal, int units) {
         //pmv.glMatrixMode(GLMatrixFunc.GL_MODELVIEW);
+        final double width = port.max(X) - port.min(X);
+        final double height = port.max(Y) - port.min(Y);
+
         if (horizontal) {
             //pmv.glTranslatef(-units * KEY_PRESS_TRANSLATE, 0f, 0f);
-            port.min(X, port.min(X) + units * KEY_PRESS_TRANSLATE);
-            port.max(X, port.max(X) + units * KEY_PRESS_TRANSLATE);
-            portToMvMatrix();
+            if (port.min(X) + units * KEY_PRESS_TRANSLATE < bounds.min(X)) {
+                port.min(X, bounds.min(X));
+                port.max(X, port.min(X) + width);
+            } else if (port.max(X) + units * KEY_PRESS_TRANSLATE > bounds.max(X)) {
+                port.max(X, bounds.max(X));
+                port.min(X, port.max(X) - width);
+            } else {
+                port.min(X, port.min(X) + units * KEY_PRESS_TRANSLATE);
+                port.max(X, port.max(X) + units * KEY_PRESS_TRANSLATE);
+            }
         } else {
             //pmv.glTranslatef(0f, -units * KEY_PRESS_TRANSLATE, 0f);
-            port.min(Y, port.min(Y) + units * KEY_PRESS_TRANSLATE);
-            port.max(Y, port.max(Y) + units * KEY_PRESS_TRANSLATE);
-            portToMvMatrix();
+            if (port.min(Y) + units * KEY_PRESS_TRANSLATE < bounds.min(Y)) {
+                port.min(Y, bounds.min(Y));
+                port.max(Y, port.min(Y) + height);
+            } else if (port.max(Y) + units * KEY_PRESS_TRANSLATE > bounds.max(Y)) {
+                port.max(Y, bounds.max(Y));
+                port.min(Y, port.max(Y) - height);
+            } else {
+                port.min(Y, port.min(Y) + units * KEY_PRESS_TRANSLATE);
+                port.max(Y, port.max(Y) + units * KEY_PRESS_TRANSLATE);
+            }
         }
+        portToMvMatrix();
     }
 
     @Override

@@ -13,9 +13,14 @@ import co.paralleluniverse.spacebase.SpatialQueries;
 import co.paralleluniverse.spacebase.SpatialSetModifyingVisitor;
 import co.paralleluniverse.spacebase.SpatialSetVisitor;
 import co.paralleluniverse.spacebase.SpatialToken;
+import co.paralleluniverse.spacebase.SpatialVisitor;
+import co.paralleluniverse.spacebase.store.memory.sync.BlockableForkJoinTask;
+import co.paralleluniverse.spacebase.store.memory.sync.BlockableRecursiveAction;
 import static java.lang.Math.cos;
 import static java.lang.Math.sin;
 import java.util.Set;
+import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  *
@@ -27,8 +32,9 @@ public class Spaceship {
     private double y;
     private double vx;
     private double vy;
-    private int neighbors;
+    private volatile int neighbors;
     private SpatialToken token;
+    private final AtomicInteger neighborCounter = new AtomicInteger();
 
     public Spaceship(Spaceships global) {
         final RandSpatial random = global.random;
@@ -73,45 +79,119 @@ public class Spaceship {
         this.token = token;
     }
 
+    void incNeighbors() {
+        neighborCounter.incrementAndGet();
+    }
+
+    void resetNeighbors() {
+        neighbors = neighborCounter.get();
+        neighborCounter.set(0);
+    }
+
     public void run(final Spaceships global) {
+        switch (global.mode) {
+            case 1:
+                run1(global);
+            case 2:
+                run2(global);
+            case 3:
+                run3(global);
+        }
+    }
+
+    public void run1(final Spaceships global) {
+        resetNeighbors();
+        move(global);
+        global.sb.update(token, getAABB());
+    }
+
+    public void run2(final Spaceships global) {
         try {
-//            global.sb.query(SpatialQueries.range(getAABB(), global.range), new SpatialSetVisitor<Spaceship>() {
-//                @Override
-//                public void visit(Set<Spaceship> result) {
-//                    neighbors = result.size();
-//                    //System.out.println("Seeing " + result.size());
-//                }
+            global.sb.query(SpatialQueries.range(getAABB(), global.range), new SpatialSetVisitor<Spaceship>() {
+                @Override
+                public void visit(Set<Spaceship> result) {
+                    final int n = result.size();
+                    neighbors = n;
+                    double tx = 0;
+                    double ty = 0;
+
+                    if (n > 1) {
+                        for (Spaceship s : result) {
+                            tx += s.x;
+                            ty += s.y;
+                        }
+
+                        tx /= n;
+                        double dx = tx - x;
+                        double dy = ty - y;
+
+                        double alpha = 0.2;
+                        vx = (1-alpha) * vx - alpha * 0.5 * dx;
+                        if(Math.abs(vx) > 10)
+                            vx = Math.signum(vx) * 10;
+                        
+                        vy = (1-alpha) * vy - alpha * 0.5 * dy;
+                        if(Math.abs(vy) > 10)
+                            vy = Math.signum(vy) * 10;
+                    }
+                    //System.out.println("Seeing " + result.size());
+                    new BlockableRecursiveAction() {
+                        @Override
+                        protected void compute() {
+                            move(global);
+                            global.sb.update(token, getAABB());
+                        }
+
+                    }.fork();
+                }
+
+            }); //.join();
+
+//            MutableAABB bounds = MutableAABB.create(2);
+//            getAABB(bounds);
+//            bounds.min(X, bounds.min(X) - global.range);
+//            bounds.max(X, bounds.max(X) + global.range);
+//            bounds.min(Y, bounds.min(Y) - global.range);
+//            bounds.max(Y, bounds.max(Y) + global.range);
+//            global.sb.transaction(SpatialQueries.and(SpatialQueries.contained(bounds), SpatialQueries.range(getAABB(), global.range)), new SpatialSetModifyingVisitor<Spaceship>() {
 //
+//                @Override
+//                public void visit(Set<ElementUpdater<Spaceship>> result) {
+//                    neighbors = result.size();
+//                    move(global);
+//                    for(ElementUpdater<Spaceship> eu : result) {
+//                        if(eu.elem() == Spaceship.this)
+//                            eu.update(getAABB());
+//                    }
+//                }
 //            }).join();
-//            try {
-//                move(global);
-//                global.sb.update(token, getAABB());
-//            } catch (Exception e) {
-//                //System.err.println("Exc:" + e.getMessage());
-//                e.printStackTrace();
-//            } finally {
-//                //System.out.println("done");
-//            }
-//          
-            MutableAABB bounds = MutableAABB.create(2);
-            getAABB(bounds);
-            bounds.min(X, bounds.min(X) - global.range);
-            bounds.max(X, bounds.max(X) + global.range);
-            bounds.min(Y, bounds.min(Y) - global.range);
-            bounds.max(Y, bounds.max(Y) + global.range);
-            global.sb.transaction(SpatialQueries.and(SpatialQueries.contained(bounds), SpatialQueries.range(getAABB(), global.range)), new SpatialSetModifyingVisitor<Spaceship>() {
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+
+    public void run3(final Spaceships global) {
+        try {
+            global.sb.query(SpatialQueries.range(getAABB(), global.range), new SpatialVisitor<Spaceship>() {
+                @Override
+                public void visit(Spaceship result, SpatialToken token) {
+                    incNeighbors();
+                }
 
                 @Override
-                public void visit(Set<ElementUpdater<Spaceship>> result) {
-                    neighbors = result.size();
-                    move(global);
-                    for(ElementUpdater<Spaceship> eu : result) {
-                        if(eu.elem() == Spaceship.this)
-                            eu.update(getAABB());
-                    }
-                    throw new UnsupportedOperationException("Not supported yet.");
+                public void done() {
+                    resetNeighbors();
+                    new BlockableRecursiveAction() {
+                        @Override
+                        protected void compute() {
+                            move(global);
+                            global.sb.update(token, getAABB());
+                        }
+
+                    }.fork();
                 }
-            }).join();
+
+            });
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }

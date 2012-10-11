@@ -5,9 +5,14 @@
 package co.paralleluniverse.spaceships;
 
 import co.paralleluniverse.spacebase.AABB;
+import co.paralleluniverse.spacebase.Debug;
 import co.paralleluniverse.spacebase.MutableAABB;
 import co.paralleluniverse.spacebase.SpaceBase;
 import co.paralleluniverse.spacebase.SpaceBaseBuilder;
+import co.paralleluniverse.spacebase.SpatialJoinVisitor;
+import co.paralleluniverse.spacebase.SpatialQueries;
+import co.paralleluniverse.spacebase.SpatialToken;
+import co.paralleluniverse.spacebase.monitoring.FlightRecorder;
 import co.paralleluniverse.spaceships.render.GLPort;
 import java.io.FileReader;
 import java.util.Properties;
@@ -27,9 +32,10 @@ public class Spaceships {
     /**
      * @param args the command line arguments
      */
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) throws Exception {        
         System.out.println("COMPILER: " + System.getProperty("java.vm.name"));
         System.out.println("VERSION: " + System.getProperty("java.version"));
+        System.out.println("PROCESSORS: " + Runtime.getRuntime().availableProcessors());
         System.out.println();
 
         Properties props = new Properties();
@@ -44,6 +50,7 @@ public class Spaceships {
         Thread.sleep(Long.MAX_VALUE);
     }
 
+    public final int mode;
     private final int N;
     private final int dim;
     public final AABB bounds;
@@ -59,10 +66,12 @@ public class Spaceships {
         this.dim = 2;
         this.async = Boolean.parseBoolean(props.getProperty("async", "true"));
         this.bounds = createDimAABB(-10000, 10000, -10000, 10000, -10000, 10000);
+        this.mode = Integer.parseInt(props.getProperty("mode", "1"));
         this.N = Integer.parseInt(props.getProperty("N", "10000"));
         this.speedVariance = Double.parseDouble(props.getProperty("speed-variance", "1"));
         this.range = Double.parseDouble(props.getProperty("radar-range", "10"));
 
+        System.out.println("===== MODE: " + mode + " =======");
         final int numThreads = Integer.parseInt(props.getProperty("io-threads", "2"));
         this.executor = new ThreadPoolExecutor(numThreads, numThreads, 0L, TimeUnit.MILLISECONDS, new SynchronousQueue<Runnable>(), new RejectedExecutionHandler() {
             @Override
@@ -127,7 +136,7 @@ public class Spaceships {
         return space;
     }
 
-    private void run() {
+    private void run() throws InterruptedException {
         {
             System.out.println("Inserting " + N + " spaceships");
             long start = System.nanoTime();
@@ -135,25 +144,47 @@ public class Spaceships {
                 final Spaceship s = ships[i];
                 MutableAABB aabb = MutableAABB.create(dim);
                 s.getAABB(aabb);
-                s.setToken(sb.insert(s, aabb));
+                final SpatialToken token = sb.insert(s, aabb);
+                token.join();
+                s.setToken(token);
             }
             System.out.println("Inserted " + N + " things in " + millis(start));
         }
 
-        GLPort port = new GLPort(N, sb);
+        GLPort port = new GLPort(N, sb, bounds);
 
+        sb.setCurrentThreadAsynchronous(async);
         for (;;) {
             long start = System.nanoTime();
-            for (int i = 0; i < N; i++) {
-                final Spaceship s = ships[i];
-                executor.submit(new Runnable() {
+
+            if (mode == 1) {
+                sb.join(SpatialQueries.distance(range), new SpatialJoinVisitor<Spaceship, Spaceship>() {
                     @Override
-                    public void run() {
-                        sb.setCurrentThreadAsynchronous(async);
-                        s.run(Spaceships.this);
+                    public void visit(Spaceship elem1, SpatialToken token1, Spaceship elem2, SpatialToken token2) {
+                        elem1.incNeighbors();
+                        elem2.incNeighbors();
                     }
 
-                });
+                }).join();
+
+                for (int i = 0; i < N; i++) {
+                    final Spaceship s = ships[i];
+                    s.run(Spaceships.this);
+                }
+            } else if (mode == 2) {
+                for (int i = 0; i < N; i++) {
+                    final Spaceship s = ships[i];
+                    s.run2(Spaceships.this);
+                }
+            } else if (mode == 3) {
+                for (int i = 0; i < N; i++) {
+                    final Spaceship s = ships[i];
+                    s.run3(Spaceships.this);
+                }
+            }
+
+            while (sb.getQueueLength() > 20) {
+                Thread.sleep(5);
             }
             System.out.println("XXX: " + millis(start));
         }
@@ -172,5 +203,4 @@ public class Spaceships {
             throw new AssertionError();
         }
     }
-
 }
