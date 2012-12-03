@@ -9,6 +9,7 @@ import co.paralleluniverse.spacebase.Debug;
 import co.paralleluniverse.spacebase.MutableAABB;
 import co.paralleluniverse.spacebase.SpaceBase;
 import co.paralleluniverse.spacebase.SpaceBaseBuilder;
+import co.paralleluniverse.spacebase.SpaceBaseExecutors;
 import co.paralleluniverse.spacebase.SpatialJoinVisitor;
 import co.paralleluniverse.spacebase.SpatialQueries;
 import co.paralleluniverse.spacebase.SpatialToken;
@@ -17,7 +18,6 @@ import co.paralleluniverse.spaceships.render.GLPort;
 import java.io.FileReader;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -32,7 +32,7 @@ public class Spaceships {
     /**
      * @param args the command line arguments
      */
-    public static void main(String[] args) throws Exception {        
+    public static void main(String[] args) throws Exception {
         System.out.println("COMPILER: " + System.getProperty("java.vm.name"));
         System.out.println("VERSION: " + System.getProperty("java.version"));
         System.out.println("PROCESSORS: " + Runtime.getRuntime().availableProcessors());
@@ -43,6 +43,8 @@ public class Spaceships {
 
         System.out.println("MARKER: " + props.getProperty("MARKER"));
 
+        dumpAfter(120);
+        
         System.out.println("Initializing...");
         final Spaceships spaceships = new Spaceships(props);
         System.out.println("Running...");
@@ -118,9 +120,9 @@ public class Spaceships {
         SpaceBaseBuilder builder = new SpaceBaseBuilder();
 
         if (parallel)
-            builder.setParallelMode(parallelism);
+            builder.setExecutor(SpaceBaseExecutors.parallel(parallelism));
         else
-            builder.setConcurrentMode(parallelism);
+            builder.setExecutor(SpaceBaseExecutors.concurrent(parallelism));
 
         if (optimistic)
             builder.setOptimisticLocking(optimisticHeight, optimisticRetryLimit);
@@ -203,4 +205,26 @@ public class Spaceships {
             throw new AssertionError();
         }
     }
+
+    private static void dumpAfter(final long seconds) {
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    Thread.sleep(seconds * 1000);
+                    dumpRecorder(Debug.getGlobalFlightRecorder(), Debug.getDumpFile());
+                } catch (InterruptedException e) {
+                }
+            }
+
+        }, "DEBUG").start();
+    }
+
+    private static void dumpRecorder(FlightRecorder recorder, String filename) {
+        if (recorder != null) {
+            System.out.println("DUMPING TO " + filename + "...");
+            recorder.dump(filename);
+            System.out.println("DUMPED TO " + filename);
+        }
+    }
+
 }
