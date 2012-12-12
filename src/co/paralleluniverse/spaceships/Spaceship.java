@@ -14,6 +14,7 @@ import co.paralleluniverse.spacebase.SpatialSetModifyingVisitor;
 import co.paralleluniverse.spacebase.SpatialSetVisitor;
 import co.paralleluniverse.spacebase.SpatialToken;
 import co.paralleluniverse.spacebase.SpatialVisitor;
+import co.paralleluniverse.spacebase.Sync;
 import co.paralleluniverse.spacebase.store.memory.sync.BlockableForkJoinTask;
 import co.paralleluniverse.spacebase.store.memory.sync.BlockableRecursiveAction;
 import static java.lang.Math.cos;
@@ -27,7 +28,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @author pron
  */
 public class Spaceship {
-
     private double x;
     private double y;
     private double vx;
@@ -88,7 +88,7 @@ public class Spaceship {
         neighborCounter.set(0);
     }
 
-    public void run(final Spaceships global) {
+    public void run(final Spaceships global) throws InterruptedException {
         switch (global.mode) {
             case 1:
                 run1(global);
@@ -99,53 +99,52 @@ public class Spaceship {
         }
     }
 
-    public void run1(final Spaceships global) {
+    public void run1(final Spaceships global) throws InterruptedException {
         resetNeighbors();
         move(global);
-        global.sb.update(token, getAABB());
+        final Sync sync = global.sb.update(token, getAABB());
+        sync.join();
     }
 
-    public void run2(final Spaceships global) {
-        try {
-            global.sb.query(SpatialQueries.range(getAABB(), global.range), new SpatialSetVisitor<Spaceship>() {
-                @Override
-                public void visit(Set<Spaceship> result) {
-                    final int n = result.size();
-                    neighbors = n;
-                    double tx = 0;
-                    double ty = 0;
+    public void run2(final Spaceships global) throws InterruptedException {
+        final Sync sync = global.sb.query(SpatialQueries.range(getAABB(), global.range), new SpatialSetVisitor<Spaceship>() {
+            @Override
+            public void visit(Set<Spaceship> result) {
+                final int n = result.size();
+                neighbors = n;
+                double tx = 0;
+                double ty = 0;
 
-                    if (n > 1) {
-                        for (Spaceship s : result) {
-                            tx += s.x;
-                            ty += s.y;
-                        }
-
-                        tx /= n;
-                        double dx = tx - x;
-                        double dy = ty - y;
-
-                        double alpha = 0.2;
-                        vx = (1-alpha) * vx - alpha * 0.5 * dx;
-                        if(Math.abs(vx) > 10)
-                            vx = Math.signum(vx) * 10;
-                        
-                        vy = (1-alpha) * vy - alpha * 0.5 * dy;
-                        if(Math.abs(vy) > 10)
-                            vy = Math.signum(vy) * 10;
+                if (n > 1) {
+                    for (Spaceship s : result) {
+                        tx += s.x;
+                        ty += s.y;
                     }
-                    //System.out.println("Seeing " + result.size());
-                    new BlockableRecursiveAction() {
-                        @Override
-                        protected void compute() {
-                            move(global);
-                            global.sb.update(token, getAABB());
-                        }
 
-                    }.fork();
+                    tx /= n;
+                    double dx = tx - x;
+                    double dy = ty - y;
+
+                    double alpha = 0.2;
+                    vx = (1 - alpha) * vx - alpha * 0.5 * dx;
+                    if (Math.abs(vx) > 10)
+                        vx = Math.signum(vx) * 10;
+
+                    vy = (1 - alpha) * vy - alpha * 0.5 * dy;
+                    if (Math.abs(vy) > 10)
+                        vy = Math.signum(vy) * 10;
                 }
-
-            }); //.join();
+                //System.out.println("Seeing " + result.size());
+                new BlockableRecursiveAction() {
+                    @Override
+                    protected void compute() {
+                        move(global);
+                        global.sb.update(token, getAABB());
+                    }
+                }.fork();
+            }
+        });
+        sync.join();
 
 //            MutableAABB bounds = MutableAABB.create(2);
 //            getAABB(bounds);
@@ -165,9 +164,6 @@ public class Spaceship {
 //                    }
 //                }
 //            }).join();
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
-        }
     }
 
     public void run3(final Spaceships global) {
@@ -187,10 +183,8 @@ public class Spaceship {
                             move(global);
                             global.sb.update(token, getAABB());
                         }
-
                     }.fork();
                 }
-
             });
         } catch (Exception ex) {
             throw new RuntimeException(ex);
@@ -213,5 +207,4 @@ public class Spaceship {
         x += vx;
         y += vy;
     }
-
 }

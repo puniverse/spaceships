@@ -28,7 +28,6 @@ import java.util.concurrent.TimeUnit;
  * @author pron
  */
 public class Spaceships {
-
     /**
      * @param args the command line arguments
      */
@@ -43,15 +42,14 @@ public class Spaceships {
 
         System.out.println("MARKER: " + props.getProperty("MARKER"));
 
-        dumpAfter(120);
-        
+        dumpAfter(180);
+
         System.out.println("Initializing...");
         final Spaceships spaceships = new Spaceships(props);
         System.out.println("Running...");
         spaceships.run();
         Thread.sleep(Long.MAX_VALUE);
     }
-
     public final int mode;
     private final int N;
     private final int dim;
@@ -84,7 +82,6 @@ public class Spaceships {
                     throw new RuntimeException(ex);
                 }
             }
-
         });
 
         this.random = new RandSpatial();
@@ -166,8 +163,12 @@ public class Spaceships {
                         elem1.incNeighbors();
                         elem2.incNeighbors();
                     }
-
                 }).join();
+
+                if (sb.getQueueLength() > 20)
+                    System.out.println("???");
+                
+                System.out.println("XXX 11: " + millis(start));
 
                 for (int i = 0; i < N; i++) {
                     final Spaceship s = ships[i];
@@ -185,6 +186,12 @@ public class Spaceships {
                 }
             }
 
+            System.out.println("XXX 22: " + millis(start));
+
+            sb.joinAllPendingOperations();
+            
+            System.out.println("XXX 33: " + millis(start));
+            
             while (sb.getQueueLength() > 20) {
                 Thread.sleep(5);
             }
@@ -215,7 +222,6 @@ public class Spaceships {
                 } catch (InterruptedException e) {
                 }
             }
-
         }, "DEBUG").start();
     }
 
@@ -226,5 +232,4 @@ public class Spaceships {
             System.out.println("DUMPED TO " + filename);
         }
     }
-
 }
