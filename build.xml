@@ -71,4 +71,12 @@
     nbproject/build-impl.xml file. 
 
     -->
+    
+    <import file="ivy-build.xml" />
+    
+    <target name="-pre-compile" depends="-ivy-retrieve"/>
+    <target name="-pre-compile-single" depends="-ivy-retrieve"/>
+    <target name="-post-clean">
+        <delete dir="lib"/>
+    </target>
 </project>
