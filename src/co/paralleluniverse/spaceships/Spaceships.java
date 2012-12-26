@@ -13,7 +13,6 @@ import co.paralleluniverse.spacebase.SpaceBaseExecutors;
 import co.paralleluniverse.spacebase.SpatialJoinVisitor;
 import co.paralleluniverse.spacebase.SpatialQueries;
 import co.paralleluniverse.spacebase.SpatialToken;
-import co.paralleluniverse.spacebase.monitoring.FlightRecorder;
 import co.paralleluniverse.spaceships.render.GLPort;
 import java.io.FileReader;
 import java.util.Properties;
@@ -42,14 +41,21 @@ public class Spaceships {
 
         System.out.println("MARKER: " + props.getProperty("MARKER"));
 
-        dumpAfter(180);
+        // dumpAfter(180);
 
         System.out.println("Initializing...");
         final Spaceships spaceships = new Spaceships(props);
         System.out.println("Running...");
-        spaceships.run();
-        Thread.sleep(Long.MAX_VALUE);
+        try {
+            spaceships.run();
+            Thread.sleep(Long.MAX_VALUE);
+        } catch (Exception e) {
+            e.printStackTrace();
+            dump();
+            System.exit(1);
+        }
     }
+    //
     public final int mode;
     private final int N;
     private final int dim;
@@ -167,7 +173,7 @@ public class Spaceships {
 
                 if (sb.getQueueLength() > 20)
                     System.out.println("???");
-                
+
                 System.out.println("XXX 11: " + millis(start));
 
                 for (int i = 0; i < N; i++) {
@@ -189,9 +195,9 @@ public class Spaceships {
             System.out.println("XXX 22: " + millis(start));
 
             sb.joinAllPendingOperations();
-            
+
             System.out.println("XXX 33: " + millis(start));
-            
+
             while (sb.getQueueLength() > 20) {
                 Thread.sleep(5);
             }
@@ -214,22 +220,21 @@ public class Spaceships {
     }
 
     private static void dumpAfter(final long seconds) {
+        if (!Debug.isDebug())
+            return;
         new Thread(new Runnable() {
             public void run() {
                 try {
                     Thread.sleep(seconds * 1000);
-                    dumpRecorder(Debug.getGlobalFlightRecorder(), Debug.getDumpFile());
+                    dump();
                 } catch (InterruptedException e) {
                 }
             }
         }, "DEBUG").start();
     }
-
-    private static void dumpRecorder(FlightRecorder recorder, String filename) {
-        if (recorder != null) {
-            System.out.println("DUMPING TO " + filename + "...");
-            recorder.dump(filename);
-            System.out.println("DUMPED TO " + filename);
-        }
+    
+    private static void dump() {
+        if (Debug.isDebug())
+            Debug.getGlobalFlightRecorder().dump(Debug.getDumpFile());
     }
 }

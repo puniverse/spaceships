@@ -7,20 +7,17 @@ package co.paralleluniverse.spaceships;
 import co.paralleluniverse.spacebase.AABB;
 import static co.paralleluniverse.spacebase.AABB.X;
 import static co.paralleluniverse.spacebase.AABB.Y;
-import co.paralleluniverse.spacebase.ElementUpdater;
 import co.paralleluniverse.spacebase.MutableAABB;
 import co.paralleluniverse.spacebase.SpatialQueries;
-import co.paralleluniverse.spacebase.SpatialSetModifyingVisitor;
 import co.paralleluniverse.spacebase.SpatialSetVisitor;
 import co.paralleluniverse.spacebase.SpatialToken;
 import co.paralleluniverse.spacebase.SpatialVisitor;
 import co.paralleluniverse.spacebase.Sync;
-import co.paralleluniverse.spacebase.store.memory.sync.BlockableForkJoinTask;
 import co.paralleluniverse.spacebase.store.memory.sync.BlockableRecursiveAction;
 import static java.lang.Math.cos;
 import static java.lang.Math.sin;
 import java.util.Set;
-import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -103,7 +100,9 @@ public class Spaceship {
         resetNeighbors();
         move(global);
         final Sync sync = global.sb.update(token, getAABB());
-        sync.join();
+        if(!sync.join(2000, TimeUnit.MILLISECONDS)) {
+            throw new RuntimeException("Timeout!");
+        }
     }
 
     public void run2(final Spaceships global) throws InterruptedException {
