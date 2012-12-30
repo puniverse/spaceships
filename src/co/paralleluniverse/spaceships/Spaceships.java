@@ -27,15 +27,17 @@ import java.util.concurrent.TimeUnit;
  * @author pron
  */
 public class Spaceships {
+    
     /**
      * @param args the command line arguments
      */
     public static void main(String[] args) throws Exception {
         System.out.println("COMPILER: " + System.getProperty("java.vm.name"));
         System.out.println("VERSION: " + System.getProperty("java.version"));
+        System.out.println("OS: " + System.getProperty("os.name"));
         System.out.println("PROCESSORS: " + Runtime.getRuntime().availableProcessors());
         System.out.println();
-
+        
         Properties props = new Properties();
         props.load(new FileReader("spaceships.properties"));
 

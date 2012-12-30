@@ -12,17 +12,18 @@ import co.paralleluniverse.spacebase.SpaceBase;
 import co.paralleluniverse.spacebase.SpatialQueries;
 import co.paralleluniverse.spacebase.SpatialSetVisitor;
 import co.paralleluniverse.spaceships.Spaceship;
-import com.jogamp.newt.event.KeyEvent;
-import com.jogamp.newt.event.KeyListener;
-import com.jogamp.newt.event.MouseEvent;
-import com.jogamp.newt.event.MouseListener;
-import com.jogamp.newt.event.WindowAdapter;
+import co.paralleluniverse.spaceships.Spaceships;
+import com.jogamp.newt.awt.NewtCanvasAWT;
 import com.jogamp.newt.event.WindowEvent;
+import com.jogamp.newt.event.WindowUpdateEvent;
 import com.jogamp.newt.opengl.GLWindow;
 import com.jogamp.opengl.util.FPSAnimator;
 import com.jogamp.opengl.util.PMVMatrix;
 import com.jogamp.opengl.util.glsl.ShaderCode;
 import com.jogamp.opengl.util.glsl.ShaderProgram;
+import java.awt.Component;
+import java.awt.EventQueue;
+import java.awt.Frame;
 import java.nio.FloatBuffer;
 import java.util.Set;
 import javax.media.opengl.DebugGL3;
@@ -35,14 +36,19 @@ import javax.media.opengl.GLEventListener;
 import javax.media.opengl.GLException;
 import javax.media.opengl.GLProfile;
 import javax.media.opengl.TraceGL3;
+import javax.media.opengl.awt.GLCanvas;
 import javax.media.opengl.fixedfunc.GLMatrixFunc;
 
 /**
  *
  * @author pron
  */
-public class GLPort implements GLEventListener, KeyListener, MouseListener {
-
+public class GLPort implements GLEventListener {
+    private enum Toolkit {
+        NEWT, NEWT_CANVAS, AWT
+    };
+    private static final Toolkit TOOLKIT = Toolkit.NEWT;
+    //
     private static final float KEY_PRESS_TRANSLATE = 10.0f;
     private final int maxItems;
     private final SpaceBase<Spaceship> sb;
@@ -66,28 +72,129 @@ public class GLPort implements GLEventListener, KeyListener, MouseListener {
 
         final GLProfile glp = GLProfile.get(GLProfile.GL3);
         final GLCapabilitiesImmutable glcaps = (GLCapabilitiesImmutable) new GLCapabilities(glp);
+        final GLAutoDrawable drawable;
+        final FPSAnimator animator;
 
-        GLWindow window = GLWindow.create(glcaps);
-        window.setSize(300, 300);
-        window.setVisible(true);
-        window.setTitle("Spaceships");
+        if (TOOLKIT == Toolkit.NEWT) {
+            final Frame glass;
 
-        final FPSAnimator animator = new FPSAnimator(window, 60);
+            if (System.getProperty("os.name").startsWith("Mac")) {
+                glass = new Frame();
+                glass.setAutoRequestFocus(true);
+                glass.setUndecorated(true);
+                glass.setOpacity(0.05f);
+            } else
+                glass = null;
 
-        window.addWindowListener(new WindowAdapter() {
-            @Override
-            public void windowDestroyNotify(WindowEvent arg0) {
-                animator.stop();
-                System.exit(0);
+            final GLWindow window = GLWindow.create(glcaps);
+            drawable = window;
+
+            drawable.addGLEventListener(this);
+            animator = new FPSAnimator(drawable, 60);
+
+            window.addWindowListener(new com.jogamp.newt.event.WindowAdapter() {
+                @Override
+                public void windowDestroyNotify(com.jogamp.newt.event.WindowEvent arg0) {
+                    animator.stop();
+                    System.exit(0);
+                }
+
+                @Override
+                public void windowGainedFocus(WindowEvent e) {
+                    if (glass != null)
+                        glass.toFront();
+                }
+
+                @Override
+                public void windowMoved(WindowEvent e) {
+                    setGlassPosition(window, glass);
+                }
+
+                @Override
+                public void windowResized(WindowEvent e) {
+                    setGlassPosition(window, glass);
+                }
+            });
+
+            if (glass == null) {
+                final NewtListener listener = new NewtListener();
+                window.addKeyListener(listener);
+                window.addMouseListener(listener);
             }
 
-        });
+            window.setSize(300, 300);
+            window.setTitle("Spaceships");
+            window.setVisible(true);
 
-        window.addGLEventListener(this);
-        window.addKeyListener(this);
-        window.addMouseListener(this);
+            if (glass != null) {
+                final AwtListener listener1 = new AwtListener();
+                glass.addKeyListener(listener1);
+                glass.addMouseListener(listener1);
+                glass.addMouseMotionListener(listener1);
+                glass.addMouseWheelListener(listener1);
+                glass.setVisible(true);
+            }
+            
+            window.runOnEDTIfAvail(false, new Runnable() {
+                @Override
+                public void run() {
+                    setGlassPosition(window, glass);
+                }
+            });
+
+        } else {
+            final Component canvas;
+
+            if (TOOLKIT == Toolkit.NEWT_CANVAS) {
+                final GLWindow newt = GLWindow.create(glcaps);
+                drawable = newt;
+                canvas = new NewtCanvasAWT(newt);
+            } else {
+                final GLCanvas glCanvas = new GLCanvas(glcaps);
+                canvas = glCanvas;
+                drawable = glCanvas;
+            }
+
+            drawable.addGLEventListener(this);
+            animator = new FPSAnimator(drawable, 60);
+
+            final Frame window = new Frame();
+            window.add(canvas);
+            window.addWindowListener(new java.awt.event.WindowAdapter() {
+                @Override
+                public void windowClosing(java.awt.event.WindowEvent windowevent) {
+                    animator.stop();
+                    window.remove(canvas);
+                    window.dispose();
+                    System.exit(0);
+                }
+            });
+
+            final AwtListener listener = new AwtListener();
+            window.addKeyListener(listener);
+            window.addMouseListener(listener);
+            window.addMouseMotionListener(listener);
+            window.addMouseWheelListener(listener);
+
+            window.setSize(300, 300);
+            window.setTitle("Spaceships");
+            window.setVisible(true);
+        }
 
         animator.start();
+    }
+
+    private void setGlassPosition(final GLWindow window, final Frame glass) {
+        if (glass != null) {
+            EventQueue.invokeLater(new Runnable() {
+                @Override
+                public void run() {
+                    glass.setLocation(window.getX() + 2, window.getY() + 2);
+                    glass.setSize(window.getWidth() - 4, window.getHeight() - 4);
+
+                }
+            });
+        }
     }
 
     @Override
@@ -182,7 +289,6 @@ public class GLPort implements GLEventListener, KeyListener, MouseListener {
                         colorsb.put(Math.min(1.0f, 0.3f + (float) s.getNeighbors() / 5.0f));
                     }
                 }
-
             }).join();
 
             vertices.rewind();
@@ -248,35 +354,6 @@ public class GLPort implements GLEventListener, KeyListener, MouseListener {
         portToMvMatrix();
     }
 
-    @Override
-    public void keyPressed(KeyEvent e) {
-        int keyCode = e.getKeyCode();
-        switch (keyCode) {
-            case KeyEvent.VK_UP:
-                movePort(false, 1);
-                break;
-            case KeyEvent.VK_DOWN:
-                movePort(false, -1);
-                break;
-            case KeyEvent.VK_LEFT:
-                movePort(true, -1);
-                break;
-            case KeyEvent.VK_RIGHT:
-                movePort(true, 1);
-                break;
-        }
-    }
-
-    @Override
-    public void mouseWheelMoved(MouseEvent e) {
-        movePort(e.isShiftDown(), e.getWheelRotation());
-//        if(e.isShiftDown()) {
-//            movePort(true, e.getWheelRotation());
-//        } else {
-//            
-//        }
-    }
-
     private void print(FloatBuffer buffer) {
         int pos = buffer.position();
         System.err.print(buffer.remaining() + ": ");
@@ -286,40 +363,134 @@ public class GLPort implements GLEventListener, KeyListener, MouseListener {
         buffer.position(pos);
     }
 
-    @Override
-    public void mouseClicked(MouseEvent e) {
+    private class AwtListener implements java.awt.event.KeyListener, java.awt.event.MouseListener, java.awt.event.MouseMotionListener, java.awt.event.MouseWheelListener {
+        @Override
+        public void keyPressed(java.awt.event.KeyEvent e) {
+            int keyCode = e.getKeyCode();
+            switch (keyCode) {
+                case java.awt.event.KeyEvent.VK_UP:
+                    movePort(false, 1);
+                    break;
+                case java.awt.event.KeyEvent.VK_DOWN:
+                    movePort(false, -1);
+                    break;
+                case java.awt.event.KeyEvent.VK_LEFT:
+                    movePort(true, -1);
+                    break;
+                case java.awt.event.KeyEvent.VK_RIGHT:
+                    movePort(true, 1);
+                    break;
+            }
+        }
+
+        @Override
+        public void mouseWheelMoved(java.awt.event.MouseWheelEvent e) {
+            movePort(e.isShiftDown(), e.getWheelRotation());
+        }
+
+        @Override
+        public void keyTyped(java.awt.event.KeyEvent e) {
+        }
+
+        @Override
+        public void keyReleased(java.awt.event.KeyEvent e) {
+        }
+
+        @Override
+        public void mouseClicked(java.awt.event.MouseEvent e) {
+        }
+
+        @Override
+        public void mousePressed(java.awt.event.MouseEvent e) {
+        }
+
+        @Override
+        public void mouseReleased(java.awt.event.MouseEvent e) {
+        }
+
+        @Override
+        public void mouseEntered(java.awt.event.MouseEvent e) {
+        }
+
+        @Override
+        public void mouseExited(java.awt.event.MouseEvent e) {
+        }
+
+        @Override
+        public void mouseDragged(java.awt.event.MouseEvent e) {
+        }
+
+        @Override
+        public void mouseMoved(java.awt.event.MouseEvent e) {
+        }
     }
 
-    @Override
-    public void mouseEntered(MouseEvent e) {
-    }
+    private class NewtListener implements com.jogamp.newt.event.KeyListener, com.jogamp.newt.event.MouseListener {
+        private boolean shiftDown;
 
-    @Override
-    public void mouseExited(MouseEvent e) {
-    }
+        @Override
+        public void keyPressed(com.jogamp.newt.event.KeyEvent e) {
+            int keyCode = e.getKeyCode();
+            switch (keyCode) {
+                case com.jogamp.newt.event.KeyEvent.VK_UP:
+                    movePort(false, 1);
+                    break;
+                case com.jogamp.newt.event.KeyEvent.VK_DOWN:
+                    movePort(false, -1);
+                    break;
+                case com.jogamp.newt.event.KeyEvent.VK_LEFT:
+                    movePort(true, -1);
+                    break;
+                case com.jogamp.newt.event.KeyEvent.VK_RIGHT:
+                    movePort(true, 1);
+                    break;
+                case com.jogamp.newt.event.KeyEvent.VK_SHIFT:
+                    shiftDown = true;
+                    break;
+            }
+        }
 
-    @Override
-    public void mousePressed(MouseEvent e) {
-    }
+        @Override
+        public void keyReleased(com.jogamp.newt.event.KeyEvent e) {
+            if (e.getKeyCode() == com.jogamp.newt.event.KeyEvent.VK_SHIFT)
+                shiftDown = false;
+        }
 
-    @Override
-    public void mouseReleased(MouseEvent e) {
-    }
+        @Override
+        public void mouseWheelMoved(com.jogamp.newt.event.MouseEvent e) {
+            movePort(e.isShiftDown(), e.getWheelRotation());
+        }
 
-    @Override
-    public void mouseMoved(MouseEvent e) {
-    }
+        @Override
+        public void keyTyped(com.jogamp.newt.event.KeyEvent e) {
+        }
 
-    @Override
-    public void mouseDragged(MouseEvent e) {
-    }
+        @Override
+        public void mouseClicked(com.jogamp.newt.event.MouseEvent e) {
+        }
 
-    @Override
-    public void keyReleased(KeyEvent e) {
-    }
+        @Override
+        public void mouseEntered(com.jogamp.newt.event.MouseEvent e) {
+        }
 
-    @Override
-    public void keyTyped(KeyEvent e) {
-    }
+        @Override
+        public void mouseExited(com.jogamp.newt.event.MouseEvent e) {
+        }
 
+        @Override
+        public void mousePressed(com.jogamp.newt.event.MouseEvent e) {
+        }
+
+        @Override
+        public void mouseReleased(com.jogamp.newt.event.MouseEvent e) {
+        }
+
+        @Override
+        public void mouseMoved(com.jogamp.newt.event.MouseEvent e) {
+        }
+
+        @Override
+        public void mouseDragged(com.jogamp.newt.event.MouseEvent e) {
+        }
+    }
 }
