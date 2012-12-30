@@ -100,10 +100,7 @@ public class Spaceship {
         resetNeighbors();
         move(global);
         final Sync sync = global.sb.update(token, getAABB());
-        sync.join();
-//        if(!sync.join(2000, TimeUnit.MILLISECONDS)) {
-//            throw new RuntimeException("Timeout!");
-//        }
+        // sync.join();
     }
 
     public void run2(final Spaceships global) throws InterruptedException {

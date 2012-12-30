@@ -174,7 +174,7 @@ public class Spaceships {
                 if (sb.getQueueLength() > 20)
                     System.out.println("???");
 
-                System.out.println("XXX 11: " + millis(start));
+                System.out.println("XXX 00: " + millis(start));
 
                 for (int i = 0; i < N; i++) {
                     final Spaceship s = ships[i];
@@ -192,16 +192,17 @@ public class Spaceships {
                 }
             }
 
-            System.out.println("XXX 22: " + millis(start));
+            System.out.println("XXX 11: " + millis(start));
 
             sb.joinAllPendingOperations();
 
-            System.out.println("XXX 33: " + millis(start));
+            System.out.println("XXX 22: " + millis(start));
 
+            final int ql = sb.getQueueLength();
             while (sb.getQueueLength() > 20) {
                 Thread.sleep(5);
             }
-            System.out.println("XXX: " + millis(start));
+            System.out.println("XXX: " + millis(start) + " ql: " + ql + " ql2: " + sb.getQueueLength());
         }
     }
 
