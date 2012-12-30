@@ -71,13 +71,17 @@ public class Spaceships {
     public Spaceships(Properties props) {
         this.dim = 2;
         this.async = Boolean.parseBoolean(props.getProperty("async", "true"));
-        this.bounds = createDimAABB(-10000, 10000, -10000, 10000, -10000, 10000);
+        double b = Double.parseDouble(props.getProperty("world-length", "20000"));
+        this.bounds = createDimAABB(-b/2, b/2, -b/2, b/2, -b/2, b/2);
         this.mode = Integer.parseInt(props.getProperty("mode", "1"));
         this.N = Integer.parseInt(props.getProperty("N", "10000"));
         this.speedVariance = Double.parseDouble(props.getProperty("speed-variance", "1"));
         this.range = Double.parseDouble(props.getProperty("radar-range", "10"));
 
         System.out.println("===== MODE: " + mode + " =======");
+        System.out.println("World bounds: " + bounds);
+        System.out.println("N: " + N);
+        
         final int numThreads = Integer.parseInt(props.getProperty("io-threads", "2"));
         this.executor = new ThreadPoolExecutor(numThreads, numThreads, 0L, TimeUnit.MILLISECONDS, new SynchronousQueue<Runnable>(), new RejectedExecutionHandler() {
             @Override
