@@ -150,7 +150,7 @@ public class Spaceship {
         try {
             global.sb.query(SpatialQueries.range(getAABB(), global.range), new SpatialVisitor<Spaceship>() {
                 @Override
-                public void visit(Spaceship result, SpatialToken token, Executor executor) {
+                public void visit(Spaceship result, SpatialToken token) {
                     incNeighbors();
                 }
 
