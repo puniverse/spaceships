@@ -145,25 +145,6 @@ public class Spaceship {
             }
         });
         sync.join();
-
-//            MutableAABB bounds = MutableAABB.create(2);
-//            getAABB(bounds);
-//            bounds.min(X, bounds.min(X) - global.range);
-//            bounds.max(X, bounds.max(X) + global.range);
-//            bounds.min(Y, bounds.min(Y) - global.range);
-//            bounds.max(Y, bounds.max(Y) + global.range);
-//            global.sb.transaction(SpatialQueries.and(SpatialQueries.contained(bounds), SpatialQueries.range(getAABB(), global.range)), new SpatialSetModifyingVisitor<Spaceship>() {
-//
-//                @Override
-//                public void visit(Set<ElementUpdater<Spaceship>> result) {
-//                    neighbors = result.size();
-//                    move(global);
-//                    for(ElementUpdater<Spaceship> eu : result) {
-//                        if(eu.elem() == Spaceship.this)
-//                            eu.update(getAABB());
-//                    }
-//                }
-//            }).join();
     }
 
     public void run3(final Spaceships global) {
