@@ -385,7 +385,7 @@ public class GLPort implements GLEventListener {
 
         @Override
         public void mouseWheelMoved(java.awt.event.MouseWheelEvent e) {
-            movePort(e.isShiftDown(), e.getWheelRotation());
+            movePort(e.isShiftDown(), (e.isShiftDown() ? 1 : -1) * e.getWheelRotation());
         }
 
         @Override
@@ -458,7 +458,7 @@ public class GLPort implements GLEventListener {
 
         @Override
         public void mouseWheelMoved(com.jogamp.newt.event.MouseEvent e) {
-            movePort(e.isShiftDown(), e.getWheelRotation());
+            movePort(e.isShiftDown(), (e.isShiftDown() ? 1 : -1) * e.getWheelRotation());
         }
 
         @Override

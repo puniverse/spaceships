@@ -89,10 +89,13 @@ public class Spaceship {
         switch (global.mode) {
             case 1:
                 run1(global);
+                break;
             case 2:
                 run2(global);
+                break;
             case 3:
                 run3(global);
+                break;
         }
     }
 
