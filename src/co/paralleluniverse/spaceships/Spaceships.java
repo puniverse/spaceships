@@ -172,7 +172,7 @@ public class Spaceships {
             if (mode == 1) {
                 sb.join(SpatialQueries.distance(range), new SpatialJoinVisitor<Spaceship, Spaceship>() {
                     @Override
-                    public void visit(Spaceship elem1, SpatialToken token1, Spaceship elem2, SpatialToken token2, Executor executor) {
+                    public void visit(Spaceship elem1, SpatialToken token1, Spaceship elem2, SpatialToken token2) {
                         elem1.incNeighbors();
                         elem2.incNeighbors();
                     }
