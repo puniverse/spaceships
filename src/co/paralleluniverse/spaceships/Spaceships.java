@@ -16,6 +16,7 @@ import co.paralleluniverse.spacebase.SpatialToken;
 import co.paralleluniverse.spaceships.render.GLPort;
 import java.io.FileReader;
 import java.util.Properties;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.SynchronousQueue;
@@ -171,7 +172,7 @@ public class Spaceships {
             if (mode == 1) {
                 sb.join(SpatialQueries.distance(range), new SpatialJoinVisitor<Spaceship, Spaceship>() {
                     @Override
-                    public void visit(Spaceship elem1, SpatialToken token1, Spaceship elem2, SpatialToken token2) {
+                    public void visit(Spaceship elem1, SpatialToken token1, Spaceship elem2, SpatialToken token2, Executor executor) {
                         elem1.incNeighbors();
                         elem2.incNeighbors();
                     }

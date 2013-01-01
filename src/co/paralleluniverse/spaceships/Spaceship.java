@@ -13,11 +13,10 @@ import co.paralleluniverse.spacebase.SpatialSetVisitor;
 import co.paralleluniverse.spacebase.SpatialToken;
 import co.paralleluniverse.spacebase.SpatialVisitor;
 import co.paralleluniverse.spacebase.Sync;
-import co.paralleluniverse.spacebase.store.memory.sync.BlockableRecursiveAction;
 import static java.lang.Math.cos;
 import static java.lang.Math.sin;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -109,7 +108,7 @@ public class Spaceship {
     public void run2(final Spaceships global) throws InterruptedException {
         final Sync sync = global.sb.query(SpatialQueries.range(getAABB(), global.range), new SpatialSetVisitor<Spaceship>() {
             @Override
-            public void visit(Set<Spaceship> result) {
+            public void visit(Set<Spaceship> result, Executor executor) {
                 final int n = result.size();
                 neighbors = n;
                 double tx = 0;
@@ -135,13 +134,13 @@ public class Spaceship {
                         vy = Math.signum(vy) * 10;
                 }
                 //System.out.println("Seeing " + result.size());
-                new BlockableRecursiveAction() {
+                executor.execute(new Runnable() {
                     @Override
-                    protected void compute() {
+                    public void run() {
                         move(global);
                         global.sb.update(token, getAABB());
                     }
-                }.fork();
+                });
             }
         });
         sync.join();
@@ -151,20 +150,21 @@ public class Spaceship {
         try {
             global.sb.query(SpatialQueries.range(getAABB(), global.range), new SpatialVisitor<Spaceship>() {
                 @Override
-                public void visit(Spaceship result, SpatialToken token) {
+                public void visit(Spaceship result, SpatialToken token, Executor executor) {
                     incNeighbors();
                 }
 
                 @Override
-                public void done() {
+                public void done(Executor executor) {
                     resetNeighbors();
-                    new BlockableRecursiveAction() {
+                    executor.execute(new Runnable() {
                         @Override
-                        protected void compute() {
+                        public void run() {
                             move(global);
                             global.sb.update(token, getAABB());
                         }
-                    }.fork();
+                    });
+
                 }
             });
         } catch (Exception ex) {

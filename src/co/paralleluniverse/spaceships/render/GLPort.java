@@ -26,6 +26,7 @@ import java.awt.EventQueue;
 import java.awt.Frame;
 import java.nio.FloatBuffer;
 import java.util.Set;
+import java.util.concurrent.Executor;
 import javax.media.opengl.DebugGL3;
 import javax.media.opengl.GL2ES2;
 import javax.media.opengl.GL3;
@@ -280,7 +281,7 @@ public class GLPort implements GLEventListener {
             //System.out.println("XXX " + verticeb + " " + port);
             sb.query(SpatialQueries.contained(port), new SpatialSetVisitor<Spaceship>() {
                 @Override
-                public void visit(Set<Spaceship> result) {
+                public void visit(Set<Spaceship> result, Executor executor) {
                     // System.out.println("Seeing " + result.size());
                     for (Spaceship s : result) {
                         verticesb.put((float) s.getX());
