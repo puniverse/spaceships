@@ -6,11 +6,13 @@ package co.paralleluniverse.spaceships;
 
 import co.paralleluniverse.spacebase.AABB;
 import co.paralleluniverse.spacebase.Debug;
+import co.paralleluniverse.spacebase.ElementUpdater;
 import co.paralleluniverse.spacebase.MutableAABB;
 import co.paralleluniverse.spacebase.SpaceBase;
 import co.paralleluniverse.spacebase.SpaceBaseBuilder;
 import co.paralleluniverse.spacebase.SpaceBaseExecutors;
 import co.paralleluniverse.spacebase.SpatialJoinVisitor;
+import co.paralleluniverse.spacebase.SpatialModifyingVisitor;
 import co.paralleluniverse.spacebase.SpatialQueries;
 import co.paralleluniverse.spacebase.SpatialToken;
 import co.paralleluniverse.spaceships.render.GLPort;
@@ -143,12 +145,15 @@ public class Spaceships {
 
         builder.setSinglePrecision(singlePrecision).setCompressed(compressed);
         builder.setNodeWidth(nodeWidth);
+        
+        //builder.setMonitoringType(SpaceBaseBuilder.MonitorType.METRICS);
+        builder.setMonitoringType(SpaceBaseBuilder.MonitorType.JMX);
 
         final SpaceBase<Spaceship> space = builder.build("base1");
         return space;
     }
 
-    private void run() throws InterruptedException {
+    private void run() throws Exception {
         {
             System.out.println("Inserting " + N + " spaceships");
             long start = System.nanoTime();
@@ -197,6 +202,20 @@ public class Spaceships {
                     final Spaceship s = ships[i];
                     s.run3(Spaceships.this);
                 }
+                
+                sb.queryForUpdate(SpatialQueries.ALL_QUERY, new SpatialModifyingVisitor<Spaceship>() {
+
+                    @Override
+                    public void visit(ElementUpdater<Spaceship> update) {
+                        final Spaceship spaceship = update.elem();
+                        spaceship.move(Spaceships.this);
+                        update.update(spaceship.getAABB());
+                    }
+
+                    @Override
+                    public void done(Executor executor) {
+                    }
+                });
             }
 
             System.out.println("XXX 11: " + millis(start));

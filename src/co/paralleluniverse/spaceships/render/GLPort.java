@@ -102,8 +102,15 @@ public class GLPort implements GLEventListener {
 
                 @Override
                 public void windowGainedFocus(WindowEvent e) {
-                    if (glass != null)
-                        glass.toFront();
+                    if (glass != null) {
+                        EventQueue.invokeLater(new Runnable() {
+                            @Override
+                            public void run() {
+                                glass.toFront();
+
+                            }
+                        });
+                    }
                 }
 
                 @Override
@@ -135,7 +142,7 @@ public class GLPort implements GLEventListener {
                 glass.addMouseWheelListener(listener1);
                 glass.setVisible(true);
             }
-            
+
             window.runOnEDTIfAvail(false, new Runnable() {
                 @Override
                 public void run() {
