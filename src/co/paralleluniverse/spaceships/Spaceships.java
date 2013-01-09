@@ -30,7 +30,6 @@ import java.util.concurrent.TimeUnit;
  * @author pron
  */
 public class Spaceships {
-    
     /**
      * @param args the command line arguments
      */
@@ -40,7 +39,7 @@ public class Spaceships {
         System.out.println("OS: " + System.getProperty("os.name"));
         System.out.println("PROCESSORS: " + Runtime.getRuntime().availableProcessors());
         System.out.println();
-        
+
         Properties props = new Properties();
         props.load(new FileReader("spaceships.properties"));
 
@@ -50,6 +49,7 @@ public class Spaceships {
 
         System.out.println("Initializing...");
         final Spaceships spaceships = new Spaceships(props);
+
         System.out.println("Running...");
         try {
             spaceships.run();
@@ -77,7 +77,7 @@ public class Spaceships {
         this.dim = 2;
         this.async = Boolean.parseBoolean(props.getProperty("async", "true"));
         double b = Double.parseDouble(props.getProperty("world-length", "20000"));
-        this.bounds = createDimAABB(-b/2, b/2, -b/2, b/2, -b/2, b/2);
+        this.bounds = createDimAABB(-b / 2, b / 2, -b / 2, b / 2, -b / 2, b / 2);
         this.mode = Integer.parseInt(props.getProperty("mode", "1"));
         this.N = Integer.parseInt(props.getProperty("N", "10000"));
         this.speedVariance = Double.parseDouble(props.getProperty("speed-variance", "1"));
@@ -86,7 +86,7 @@ public class Spaceships {
         System.out.println("===== MODE: " + mode + " =======");
         System.out.println("World bounds: " + bounds);
         System.out.println("N: " + N);
-        
+
         final int numThreads = Integer.parseInt(props.getProperty("io-threads", "2"));
         this.executor = new ThreadPoolExecutor(numThreads, numThreads, 0L, TimeUnit.MILLISECONDS, new SynchronousQueue<Runnable>(), new RejectedExecutionHandler() {
             @Override
@@ -145,7 +145,7 @@ public class Spaceships {
 
         builder.setSinglePrecision(singlePrecision).setCompressed(compressed);
         builder.setNodeWidth(nodeWidth);
-        
+
         //builder.setMonitoringType(SpaceBaseBuilder.MonitorType.METRICS);
         builder.setMonitoringType(SpaceBaseBuilder.MonitorType.JMX);
 
@@ -167,6 +167,9 @@ public class Spaceships {
             }
             System.out.println("Inserted " + N + " things in " + millis(start));
         }
+
+//        System.out.println("Sleeping for 5 seconds....");
+//        Thread.sleep(5000);
 
         GLPort port = new GLPort(N, sb, bounds);
 
@@ -202,9 +205,8 @@ public class Spaceships {
                     final Spaceship s = ships[i];
                     s.run3(Spaceships.this);
                 }
-                
-                sb.queryForUpdate(SpatialQueries.ALL_QUERY, new SpatialModifyingVisitor<Spaceship>() {
 
+                sb.queryForUpdate(SpatialQueries.ALL_QUERY, new SpatialModifyingVisitor<Spaceship>() {
                     @Override
                     public void visit(ElementUpdater<Spaceship> update) {
                         final Spaceship spaceship = update.elem();
@@ -259,7 +261,7 @@ public class Spaceships {
             }
         }, "DEBUG").start();
     }
-    
+
     private static void dump() {
         if (Debug.isDebug())
             Debug.getGlobalFlightRecorder().dump(Debug.getDumpFile());

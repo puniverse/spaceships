@@ -124,13 +124,13 @@ public class Spaceship {
                     double dy = ty - y;
 
                     double alpha = 0.2;
-                    vx = (1 - alpha) * vx - alpha * 0.5 * dx;
-                    if (Math.abs(vx) > 10)
-                        vx = Math.signum(vx) * 10;
-
-                    vy = (1 - alpha) * vy - alpha * 0.5 * dy;
-                    if (Math.abs(vy) > 10)
-                        vy = Math.signum(vy) * 10;
+//                    vx = (1 - alpha) * vx - alpha * 0.5 * dx;
+//                    if (Math.abs(vx) > 10)
+//                        vx = Math.signum(vx) * 10;
+//
+//                    vy = (1 - alpha) * vy - alpha * 0.5 * dy;
+//                    if (Math.abs(vy) > 10)
+//                        vy = Math.signum(vy) * 10;
                 }
                 //System.out.println("Seeing " + result.size());
                 executor.execute(new Runnable() {
@@ -165,13 +165,13 @@ public class Spaceship {
                     double dy = ty - y;
 
                     double alpha = 0.2;
-                    vx = (1 - alpha) * vx - alpha * 0.5 * dx;
-                    if (Math.abs(vx) > 10)
-                        vx = Math.signum(vx) * 10;
-
-                    vy = (1 - alpha) * vy - alpha * 0.5 * dy;
-                    if (Math.abs(vy) > 10)
-                        vy = Math.signum(vy) * 10;
+//                    vx = (1 - alpha) * vx - alpha * 0.5 * dx;
+//                    if (Math.abs(vx) > 10)
+//                        vx = Math.signum(vx) * 10;
+//
+//                    vy = (1 - alpha) * vy - alpha * 0.5 * dy;
+//                    if (Math.abs(vy) > 10)
+//                        vy = Math.signum(vy) * 10;
                 }
             }
         });
