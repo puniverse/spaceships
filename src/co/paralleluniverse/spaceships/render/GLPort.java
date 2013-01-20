@@ -48,7 +48,7 @@ public class GLPort implements GLEventListener {
     private enum Toolkit {
         NEWT, NEWT_CANVAS, AWT
     };
-    private static final Toolkit TOOLKIT = Toolkit.NEWT;
+    private static final Toolkit TOOLKIT = Toolkit.NEWT_CANVAS;
     //
     private static final float KEY_PRESS_TRANSLATE = 10.0f;
     private final int maxItems;
@@ -77,16 +77,6 @@ public class GLPort implements GLEventListener {
         final FPSAnimator animator;
 
         if (TOOLKIT == Toolkit.NEWT) {
-            final Frame glass;
-
-            if (System.getProperty("os.name").startsWith("Mac")) {
-                glass = new Frame();
-                glass.setAutoRequestFocus(true);
-                glass.setUndecorated(true);
-                glass.setOpacity(0.05f);
-            } else
-                glass = null;
-
             final GLWindow window = GLWindow.create(glcaps);
             drawable = window;
 
@@ -99,56 +89,15 @@ public class GLPort implements GLEventListener {
                     animator.stop();
                     System.exit(0);
                 }
-
-                @Override
-                public void windowGainedFocus(WindowEvent e) {
-                    if (glass != null) {
-                        EventQueue.invokeLater(new Runnable() {
-                            @Override
-                            public void run() {
-                                glass.toFront();
-
-                            }
-                        });
-                    }
-                }
-
-                @Override
-                public void windowMoved(WindowEvent e) {
-                    setGlassPosition(window, glass);
-                }
-
-                @Override
-                public void windowResized(WindowEvent e) {
-                    setGlassPosition(window, glass);
-                }
             });
 
-            if (glass == null) {
-                final NewtListener listener = new NewtListener();
-                window.addKeyListener(listener);
-                window.addMouseListener(listener);
-            }
+            final NewtListener listener = new NewtListener();
+            window.addKeyListener(listener);
+            window.addMouseListener(listener);
 
             window.setSize(300, 300);
             window.setTitle("Spaceships");
             window.setVisible(true);
-
-            if (glass != null) {
-                final AwtListener listener1 = new AwtListener();
-                glass.addKeyListener(listener1);
-                glass.addMouseListener(listener1);
-                glass.addMouseMotionListener(listener1);
-                glass.addMouseWheelListener(listener1);
-                glass.setVisible(true);
-            }
-
-            window.runOnEDTIfAvail(false, new Runnable() {
-                @Override
-                public void run() {
-                    setGlassPosition(window, glass);
-                }
-            });
 
         } else {
             final Component canvas;
@@ -157,6 +106,10 @@ public class GLPort implements GLEventListener {
                 final GLWindow newt = GLWindow.create(glcaps);
                 drawable = newt;
                 canvas = new NewtCanvasAWT(newt);
+
+                final NewtListener listener = new NewtListener();
+                newt.addKeyListener(listener);
+                newt.addMouseListener(listener);
             } else {
                 final GLCanvas glCanvas = new GLCanvas(glcaps);
                 canvas = glCanvas;
@@ -178,11 +131,13 @@ public class GLPort implements GLEventListener {
                 }
             });
 
-            final AwtListener listener = new AwtListener();
-            window.addKeyListener(listener);
-            window.addMouseListener(listener);
-            window.addMouseMotionListener(listener);
-            window.addMouseWheelListener(listener);
+            if (TOOLKIT == Toolkit.AWT) {
+                final AwtListener listener = new AwtListener();
+                window.addKeyListener(listener);
+                window.addMouseListener(listener);
+                window.addMouseMotionListener(listener);
+                window.addMouseWheelListener(listener);
+            }
 
             window.setSize(300, 300);
             window.setTitle("Spaceships");
@@ -190,19 +145,6 @@ public class GLPort implements GLEventListener {
         }
 
         animator.start();
-    }
-
-    private void setGlassPosition(final GLWindow window, final Frame glass) {
-        if (glass != null) {
-            EventQueue.invokeLater(new Runnable() {
-                @Override
-                public void run() {
-                    glass.setLocation(window.getX() + 2, window.getY() + 2);
-                    glass.setSize(window.getWidth() - 4, window.getHeight() - 4);
-
-                }
-            });
-        }
     }
 
     @Override
@@ -329,7 +271,7 @@ public class GLPort implements GLEventListener {
         portToMvMatrix();
     }
 
-    private void movePort(boolean horizontal, int units) {
+    private void movePort(boolean horizontal, double units) {
         //pmv.glMatrixMode(GLMatrixFunc.GL_MODELVIEW);
         final double width = port.max(X) - port.min(X);
         final double height = port.max(Y) - port.min(Y);
@@ -434,8 +376,6 @@ public class GLPort implements GLEventListener {
     }
 
     private class NewtListener implements com.jogamp.newt.event.KeyListener, com.jogamp.newt.event.MouseListener {
-        private boolean shiftDown;
-
         @Override
         public void keyPressed(com.jogamp.newt.event.KeyEvent e) {
             int keyCode = e.getKeyCode();
@@ -452,21 +392,16 @@ public class GLPort implements GLEventListener {
                 case com.jogamp.newt.event.KeyEvent.VK_RIGHT:
                     movePort(true, 1);
                     break;
-                case com.jogamp.newt.event.KeyEvent.VK_SHIFT:
-                    shiftDown = true;
-                    break;
             }
         }
 
         @Override
-        public void keyReleased(com.jogamp.newt.event.KeyEvent e) {
-            if (e.getKeyCode() == com.jogamp.newt.event.KeyEvent.VK_SHIFT)
-                shiftDown = false;
+        public void mouseWheelMoved(com.jogamp.newt.event.MouseEvent e) {
+            movePort(e.isShiftDown(), -0.6 * (e.isShiftDown() ? 1 : -1) * e.getWheelRotation());
         }
 
         @Override
-        public void mouseWheelMoved(com.jogamp.newt.event.MouseEvent e) {
-            movePort(e.isShiftDown(), (e.isShiftDown() ? 1 : -1) * e.getWheelRotation());
+        public void keyReleased(com.jogamp.newt.event.KeyEvent e) {
         }
 
         @Override
