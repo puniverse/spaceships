@@ -288,7 +288,7 @@ public class GLPort implements GLEventListener {
             //System.out.println("XXX " + verticeb + " " + port);
             sb.query(SpatialQueries.contained(port), new SpatialSetVisitor<Spaceship>() {
                 @Override
-                public void visit(Set<Spaceship> result, Executor executor) {
+                public void visit(Set<Spaceship> result) {
                     // System.out.println("Seeing " + result.size());
                     for (Spaceship s : result) {
                         verticesb.put((float) s.getX());

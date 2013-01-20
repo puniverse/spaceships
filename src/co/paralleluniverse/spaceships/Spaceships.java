@@ -191,10 +191,22 @@ public class Spaceships {
 
                 System.out.println("XXX 00: " + millis(start));
 
-                for (int i = 0; i < N; i++) {
-                    final Spaceship s = ships[i];
-                    s.run(Spaceships.this);
-                }
+                sb.queryForUpdate(SpatialQueries.ALL_QUERY, new SpatialModifyingVisitor<Spaceship>() {
+                    @Override
+                    public void visit(ElementUpdater<Spaceship> update) {
+                        final Spaceship spaceship = update.elem();
+                        spaceship.move(Spaceships.this);
+                        update.update(spaceship.getAABB());
+                    }
+
+                    @Override
+                    public void done() {
+                    }
+                });
+//                for (int i = 0; i < N; i++) {
+//                    final Spaceship s = ships[i];
+//                    s.run(Spaceships.this);
+//                }
             } else if (mode == 2) {
                 for (int i = 0; i < N; i++) {
                     final Spaceship s = ships[i];
@@ -215,7 +227,7 @@ public class Spaceships {
                     }
 
                     @Override
-                    public void done(Executor executor) {
+                    public void done() {
                     }
                 });
             }

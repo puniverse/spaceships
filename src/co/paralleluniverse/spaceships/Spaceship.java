@@ -83,20 +83,6 @@ public class Spaceship {
         neighborCounter.set(0);
     }
 
-    public void run(final Spaceships global) throws Exception {
-        switch (global.mode) {
-            case 1:
-                run1(global);
-                break;
-            case 2:
-                run2(global);
-                break;
-            case 3:
-                run3(global);
-                break;
-        }
-    }
-
     public void run1(final Spaceships global) throws Exception {
         resetNeighbors();
         move(global);
@@ -107,7 +93,7 @@ public class Spaceship {
     public void run2(final Spaceships global) throws Exception {
         final Sync sync = global.sb.query(SpatialQueries.range(getAABB(), global.range), new SpatialSetVisitor<Spaceship>() {
             @Override
-            public void visit(Set<Spaceship> result, Executor executor) {
+            public void visit(Set<Spaceship> result) {
                 final int n = result.size();
                 neighbors = n;
                 double tx = 0;
@@ -133,13 +119,9 @@ public class Spaceship {
 //                        vy = Math.signum(vy) * 10;
                 }
                 //System.out.println("Seeing " + result.size());
-                executor.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        move(global);
-                        global.sb.update(token, getAABB());
-                    }
-                });
+
+                move(global);
+                global.sb.update(token, getAABB());
             }
         });
         //sync.join();
@@ -148,7 +130,7 @@ public class Spaceship {
     public void run3(final Spaceships global) throws Exception {
         final Sync sync = global.sb.query(SpatialQueries.range(getAABB(), global.range), new SpatialSetVisitor<Spaceship>() {
             @Override
-            public void visit(Set<Spaceship> result, Executor executor) {
+            public void visit(Set<Spaceship> result) {
                 final int n = result.size();
                 neighbors = n;
                 double tx = 0;
