@@ -12,21 +12,16 @@ import co.paralleluniverse.spacebase.SpaceBase;
 import co.paralleluniverse.spacebase.SpatialQueries;
 import co.paralleluniverse.spacebase.SpatialSetVisitor;
 import co.paralleluniverse.spaceships.Spaceship;
-import co.paralleluniverse.spaceships.Spaceships;
 import com.jogamp.newt.awt.NewtCanvasAWT;
-import com.jogamp.newt.event.WindowEvent;
-import com.jogamp.newt.event.WindowUpdateEvent;
 import com.jogamp.newt.opengl.GLWindow;
 import com.jogamp.opengl.util.FPSAnimator;
 import com.jogamp.opengl.util.PMVMatrix;
 import com.jogamp.opengl.util.glsl.ShaderCode;
 import com.jogamp.opengl.util.glsl.ShaderProgram;
 import java.awt.Component;
-import java.awt.EventQueue;
 import java.awt.Frame;
 import java.nio.FloatBuffer;
 import java.util.Set;
-import java.util.concurrent.Executor;
 import javax.media.opengl.DebugGL3;
 import javax.media.opengl.GL2ES2;
 import javax.media.opengl.GL3;
@@ -36,7 +31,6 @@ import javax.media.opengl.GLCapabilitiesImmutable;
 import javax.media.opengl.GLEventListener;
 import javax.media.opengl.GLException;
 import javax.media.opengl.GLProfile;
-import javax.media.opengl.TraceGL3;
 import javax.media.opengl.awt.GLCanvas;
 import javax.media.opengl.fixedfunc.GLMatrixFunc;
 
@@ -45,10 +39,10 @@ import javax.media.opengl.fixedfunc.GLMatrixFunc;
  * @author pron
  */
 public class GLPort implements GLEventListener {
-    private enum Toolkit {
+    public enum Toolkit {
         NEWT, NEWT_CANVAS, AWT
     };
-    private static final Toolkit TOOLKIT = Toolkit.NEWT_CANVAS;
+    private final Toolkit TOOLKIT;
     //
     private static final float KEY_PRESS_TRANSLATE = 10.0f;
     private final int maxItems;
@@ -61,12 +55,14 @@ public class GLPort implements GLEventListener {
     private VBO colors;
     private PMVMatrix pmv = new PMVMatrix();
     private float x = 1.0f;
+    private final FPSAnimator animator;
 
     static {
         GLProfile.initSingleton();
     }
 
-    public GLPort(int maxItems, SpaceBase<Spaceship> sb, AABB bounds) {
+    public GLPort(Toolkit toolkit, int maxItems, SpaceBase<Spaceship> sb, AABB bounds) {
+        TOOLKIT = toolkit;
         this.maxItems = maxItems;
         this.sb = sb;
         this.bounds = bounds;
@@ -74,14 +70,32 @@ public class GLPort implements GLEventListener {
         final GLProfile glp = GLProfile.get(GLProfile.GL3);
         final GLCapabilitiesImmutable glcaps = (GLCapabilitiesImmutable) new GLCapabilities(glp);
         final GLAutoDrawable drawable;
-        final FPSAnimator animator;
+
+        if (TOOLKIT == Toolkit.NEWT || TOOLKIT == Toolkit.NEWT_CANVAS) {
+            final GLWindow newt = GLWindow.create(glcaps);
+
+            final NewtListener listener = new NewtListener();
+            newt.addKeyListener(listener);
+            newt.addMouseListener(listener);
+
+            drawable = newt;
+        } else {
+            final GLCanvas glCanvas = new GLCanvas(glcaps);
+
+            final AwtListener listener = new AwtListener();
+            glCanvas.addKeyListener(listener);
+            glCanvas.addMouseListener(listener);
+            glCanvas.addMouseMotionListener(listener);
+            glCanvas.addMouseWheelListener(listener);
+
+            drawable = glCanvas;
+        }
+
+        drawable.addGLEventListener(this);
+        animator = new FPSAnimator(drawable, 60);
 
         if (TOOLKIT == Toolkit.NEWT) {
-            final GLWindow window = GLWindow.create(glcaps);
-            drawable = window;
-
-            drawable.addGLEventListener(this);
-            animator = new FPSAnimator(drawable, 60);
+            final GLWindow window = (GLWindow) drawable;
 
             window.addWindowListener(new com.jogamp.newt.event.WindowAdapter() {
                 @Override
@@ -90,37 +104,19 @@ public class GLPort implements GLEventListener {
                     System.exit(0);
                 }
             });
-
-            final NewtListener listener = new NewtListener();
-            window.addKeyListener(listener);
-            window.addMouseListener(listener);
-
             window.setSize(300, 300);
             window.setTitle("Spaceships");
             window.setVisible(true);
-
         } else {
             final Component canvas;
 
-            if (TOOLKIT == Toolkit.NEWT_CANVAS) {
-                final GLWindow newt = GLWindow.create(glcaps);
-                drawable = newt;
-                canvas = new NewtCanvasAWT(newt);
-
-                final NewtListener listener = new NewtListener();
-                newt.addKeyListener(listener);
-                newt.addMouseListener(listener);
-            } else {
-                final GLCanvas glCanvas = new GLCanvas(glcaps);
-                canvas = glCanvas;
-                drawable = glCanvas;
-            }
-
-            drawable.addGLEventListener(this);
-            animator = new FPSAnimator(drawable, 60);
+            if (TOOLKIT == Toolkit.NEWT_CANVAS)
+                canvas = new NewtCanvasAWT((GLWindow) drawable);
+            else
+                canvas = (GLCanvas) drawable;
 
             final Frame window = new Frame();
-            window.add(canvas);
+
             window.addWindowListener(new java.awt.event.WindowAdapter() {
                 @Override
                 public void windowClosing(java.awt.event.WindowEvent windowevent) {
@@ -131,14 +127,9 @@ public class GLPort implements GLEventListener {
                 }
             });
 
-            if (TOOLKIT == Toolkit.AWT) {
-                final AwtListener listener = new AwtListener();
-                window.addKeyListener(listener);
-                window.addMouseListener(listener);
-                window.addMouseMotionListener(listener);
-                window.addMouseWheelListener(listener);
-            }
-
+            window.add(canvas);
+            window.pack();
+            canvas.requestFocusInWindow();
             window.setSize(300, 300);
             window.setTitle("Spaceships");
             window.setVisible(true);
@@ -397,7 +388,7 @@ public class GLPort implements GLEventListener {
 
         @Override
         public void mouseWheelMoved(com.jogamp.newt.event.MouseEvent e) {
-            movePort(e.isShiftDown(), -0.6 * (e.isShiftDown() ? 1 : -1) * e.getWheelRotation());
+            movePort(e.isShiftDown(), -1 * (e.isShiftDown() ? 1 : -1) * e.getWheelRotation());
         }
 
         @Override

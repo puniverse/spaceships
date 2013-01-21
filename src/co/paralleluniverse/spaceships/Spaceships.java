@@ -61,6 +61,7 @@ public class Spaceships {
         }
     }
     //
+    private final GLPort.Toolkit toolkit;
     public final int mode;
     private final int N;
     private final int dim;
@@ -106,7 +107,9 @@ public class Spaceships {
             ships[i] = new Spaceship(this);
 
         this.sb = initSpaceBase(props);
-
+        toolkit = GLPort.Toolkit.valueOf(props.getProperty("ui-toolkit", "NEWT").toUpperCase());
+        
+        System.out.println("UI Toolkit: " + toolkit);
     }
 
     private SpaceBase<Spaceship> initSpaceBase(Properties props) {
@@ -171,7 +174,7 @@ public class Spaceships {
 //        System.out.println("Sleeping for 5 seconds....");
 //        Thread.sleep(5000);
 
-        GLPort port = new GLPort(N, sb, bounds);
+        GLPort port = new GLPort(toolkit, N, sb, bounds);
 
         sb.setCurrentThreadAsynchronous(async);
         for (;;) {
