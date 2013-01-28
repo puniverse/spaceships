@@ -227,7 +227,7 @@ public class GLPort implements GLEventListener {
                         verticesb.put((float) s.getX());
                         verticesb.put((float) s.getY());
 
-                        colorsb.put(Math.min(1.0f, 0.3f + (float) s.getNeighbors() / 5.0f));
+                        colorsb.put(Math.min(1.0f, 0.1f + (float) s.getNeighbors() / 10.0f));
                     }
                 }
             }).join();
@@ -259,6 +259,7 @@ public class GLPort implements GLEventListener {
         gl.glViewport(0, 0, width, height);
         port.max(X, port.min(X) + width);
         port.max(Y, port.min(Y) + height);
+        System.out.println("========= " + (port.max(X) - port.min(X)) + "x" + (port.max(X) - port.min(X)) + " =========");
         portToMvMatrix();
     }
 
