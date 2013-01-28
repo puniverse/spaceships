@@ -7,6 +7,7 @@ package co.paralleluniverse.spaceships.render;
 import co.paralleluniverse.spacebase.AABB;
 import static co.paralleluniverse.spacebase.AABB.X;
 import static co.paralleluniverse.spacebase.AABB.Y;
+import co.paralleluniverse.spacebase.ElementUpdater;
 import co.paralleluniverse.spacebase.MutableAABB;
 import co.paralleluniverse.spacebase.SpaceBase;
 import co.paralleluniverse.spacebase.SpatialQueries;
@@ -221,9 +222,8 @@ public class GLPort implements GLEventListener {
             //System.out.println("XXX " + verticeb + " " + port);
             sb.query(SpatialQueries.contained(port), new SpatialSetVisitor<Spaceship>() {
                 @Override
-                public void visit(Set<Spaceship> result) {
-                    // System.out.println("Seeing " + result.size());
-                    for (Spaceship s : result) {
+                public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
+                    for (Spaceship s : resultReadOnly) {
                         verticesb.put((float) s.getX());
                         verticesb.put((float) s.getY());
 

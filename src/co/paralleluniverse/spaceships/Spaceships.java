@@ -18,7 +18,6 @@ import co.paralleluniverse.spacebase.SpatialToken;
 import co.paralleluniverse.spaceships.render.GLPort;
 import java.io.FileReader;
 import java.util.Properties;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.SynchronousQueue;
@@ -108,7 +107,7 @@ public class Spaceships {
 
         this.sb = initSpaceBase(props);
         toolkit = GLPort.Toolkit.valueOf(props.getProperty("ui-toolkit", "NEWT").toUpperCase());
-        
+
         System.out.println("UI Toolkit: " + toolkit);
     }
 
@@ -181,13 +180,17 @@ public class Spaceships {
             long start = System.nanoTime();
 
             if (mode == 1) {
+                // boolean j = 
                 sb.join(SpatialQueries.distance(range), new SpatialJoinVisitor<Spaceship, Spaceship>() {
                     @Override
                     public void visit(Spaceship elem1, SpatialToken token1, Spaceship elem2, SpatialToken token2) {
                         elem1.incNeighbors();
                         elem2.incNeighbors();
                     }
-                }).join();
+                }).join(); // join(3000, TimeUnit.MILLISECONDS);
+
+//                if(!j)
+//                    System.exit(1);
 
                 if (sb.getQueueLength() > 20)
                     System.out.println("???");
@@ -218,7 +221,12 @@ public class Spaceships {
             } else if (mode == 3) {
                 for (int i = 0; i < N; i++) {
                     final Spaceship s = ships[i];
-                    s.run3(Spaceships.this);
+                    s.run2(Spaceships.this);
+                }
+            } else if (mode == 4) {
+                for (int i = 0; i < N; i++) {
+                    final Spaceship s = ships[i];
+                    s.run4(Spaceships.this);
                 }
 
                 sb.queryForUpdate(SpatialQueries.ALL_QUERY, new SpatialModifyingVisitor<Spaceship>() {
