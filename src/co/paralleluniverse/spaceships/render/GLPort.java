@@ -215,8 +215,8 @@ public class GLPort implements GLEventListener {
             shaderState.bind(gl);
             vao.bind(gl);
 
-            vertices.rewind();
-            colors.rewind();
+            vertices.reset();
+            colors.reset();
             final FloatBuffer verticesb = (FloatBuffer) vertices.getBuffer();
             final FloatBuffer colorsb = (FloatBuffer) colors.getBuffer();
             //System.out.println("XXX " + verticeb + " " + port);
@@ -232,8 +232,8 @@ public class GLPort implements GLEventListener {
                 }
             }).join();
 
-            vertices.rewind();
-            colors.rewind();
+            vertices.flip();
+            colors.flip();
 
             int numElems = verticesb.limit() / 2;
             vertices.write(gl, 0, numElems);

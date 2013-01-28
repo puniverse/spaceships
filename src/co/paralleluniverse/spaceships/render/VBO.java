@@ -144,6 +144,11 @@ public class VBO {
         return componentByteSize * (buffer.position() == 0 ? buffer.limit() : buffer.position());
     }
 
+    public void reset() {
+        buffer.limit(buffer.capacity());
+        buffer.rewind();
+    }
+    
     public void rewind() {
         buffer.rewind();
     }
