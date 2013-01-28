@@ -15,6 +15,7 @@ import co.paralleluniverse.spacebase.SpatialJoinVisitor;
 import co.paralleluniverse.spacebase.SpatialModifyingVisitor;
 import co.paralleluniverse.spacebase.SpatialQueries;
 import co.paralleluniverse.spacebase.SpatialToken;
+import co.paralleluniverse.spacebase.Sync;
 import co.paralleluniverse.spaceships.render.GLPort;
 import java.io.FileReader;
 import java.util.Properties;
@@ -29,6 +30,8 @@ import java.util.concurrent.TimeUnit;
  * @author pron
  */
 public class Spaceships {
+    public static Spaceships spaceships;
+
     /**
      * @param args the command line arguments
      */
@@ -47,7 +50,7 @@ public class Spaceships {
         // dumpAfter(180);
 
         System.out.println("Initializing...");
-        final Spaceships spaceships = new Spaceships(props);
+        spaceships = new Spaceships(props);
 
         System.out.println("Running...");
         try {
@@ -103,7 +106,7 @@ public class Spaceships {
 
         this.ships = new Spaceship[N];
         for (int i = 0; i < N; i++)
-            ships[i] = new Spaceship(this);
+            ships[i] = Spaceship.create(this);
 
         this.sb = initSpaceBase(props);
         toolkit = GLPort.Toolkit.valueOf(props.getProperty("ui-toolkit", "NEWT").toUpperCase());
@@ -148,8 +151,7 @@ public class Spaceships {
         builder.setSinglePrecision(singlePrecision).setCompressed(compressed);
         builder.setNodeWidth(nodeWidth);
 
-        //builder.setMonitoringType(SpaceBaseBuilder.MonitorType.METRICS);
-        builder.setMonitoringType(SpaceBaseBuilder.MonitorType.JMX);
+        builder.setMonitoringType(SpaceBaseBuilder.MonitorType.JMX); // (SpaceBaseBuilder.MonitorType.METRICS); // 
 
         final SpaceBase<Spaceship> space = builder.build("base1");
         return space;
@@ -180,67 +182,29 @@ public class Spaceships {
             long start = System.nanoTime();
 
             if (mode == 1) {
-                // boolean j = 
                 sb.join(SpatialQueries.distance(range), new SpatialJoinVisitor<Spaceship, Spaceship>() {
                     @Override
                     public void visit(Spaceship elem1, SpatialToken token1, Spaceship elem2, SpatialToken token2) {
                         elem1.incNeighbors();
                         elem2.incNeighbors();
                     }
-                }).join(); // join(3000, TimeUnit.MILLISECONDS);
-
-//                if(!j)
-//                    System.exit(1);
+                }).join();
 
                 if (sb.getQueueLength() > 20)
                     System.out.println("???");
 
                 System.out.println("XXX 00: " + millis(start));
 
-                sb.queryForUpdate(SpatialQueries.ALL_QUERY, new SpatialModifyingVisitor<Spaceship>() {
-                    @Override
-                    public void visit(ElementUpdater<Spaceship> update) {
-                        final Spaceship spaceship = update.elem();
-                        spaceship.move(Spaceships.this);
-                        update.update(spaceship.getAABB());
-                    }
-
-                    @Override
-                    public void done() {
-                    }
-                });
-//                for (int i = 0; i < N; i++) {
-//                    final Spaceship s = ships[i];
-//                    s.run(Spaceships.this);
-//                }
-            } else if (mode == 2) {
+                updateAll();
+            } else {
                 for (int i = 0; i < N; i++) {
                     final Spaceship s = ships[i];
-                    s.run2(Spaceships.this);
-                }
-            } else if (mode == 3) {
-                for (int i = 0; i < N; i++) {
-                    final Spaceship s = ships[i];
-                    s.run2(Spaceships.this);
-                }
-            } else if (mode == 4) {
-                for (int i = 0; i < N; i++) {
-                    final Spaceship s = ships[i];
-                    s.run4(Spaceships.this);
+                    final Sync sync = s.run(Spaceships.this);
+                    // sync.join();
                 }
 
-                sb.queryForUpdate(SpatialQueries.ALL_QUERY, new SpatialModifyingVisitor<Spaceship>() {
-                    @Override
-                    public void visit(ElementUpdater<Spaceship> update) {
-                        final Spaceship spaceship = update.elem();
-                        spaceship.move(Spaceships.this);
-                        update.update(spaceship.getAABB());
-                    }
-
-                    @Override
-                    public void done() {
-                    }
-                });
+                if(mode == 4)
+                    updateAll();
             }
 
             System.out.println("XXX 11: " + millis(start));
@@ -254,7 +218,24 @@ public class Spaceships {
                 Thread.sleep(5);
             }
             System.out.println("XXX: " + millis(start) + " ql: " + ql + " ql2: " + sb.getQueueLength());
+            
+            // System.out.println("==== " + sb.size());
         }
+    }
+
+    private void updateAll() {
+        sb.queryForUpdate(SpatialQueries.ALL_QUERY, new SpatialModifyingVisitor<Spaceship>() {
+            @Override
+            public void visit(ElementUpdater<Spaceship> update) {
+                final Spaceship spaceship = update.elem();
+                spaceship.move(Spaceships.this);
+                update.update(spaceship.getAABB());
+            }
+
+            @Override
+            public void done() {
+            }
+        });
     }
 
     private float millis(long nanoStart) {
@@ -275,6 +256,7 @@ public class Spaceships {
         if (!Debug.isDebug())
             return;
         new Thread(new Runnable() {
+            @Override
             public void run() {
                 try {
                     Thread.sleep(seconds * 1000);

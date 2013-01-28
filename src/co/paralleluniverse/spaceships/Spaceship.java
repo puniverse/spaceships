@@ -23,17 +23,91 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  * @author pron
  */
-public class Spaceship {
+public abstract class Spaceship {
+    public static Spaceship create(Spaceships global) {
+        final int mode = global.mode;
+        switch (mode) {
+            case 1:
+                return new Spaceship(global) {
+                    @Override
+                    public Sync run(final Spaceships global) throws Exception {
+                        resetNeighbors();
+                        move(global);
+                        return global.sb.update(token, getAABB());
+                    }
+                };
+            case 2:
+                return new Spaceship(global) {
+                    @Override
+                    public Sync run(final Spaceships global) throws Exception {
+                        return global.sb.query(SpatialQueries.range(getAABB(), global.range), new SpatialSetVisitor<Spaceship>() {
+                            @Override
+                            public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
+                                process(resultReadOnly);
+
+                                global.sb.update(token, new UpdateVisitor<Spaceship>() {
+                                    @Override
+                                    public AABB visit(Spaceship elem) {
+                                        move(global);
+                                        return getAABB();
+                                    }
+                                });
+                            }
+                        });
+                    }
+                };
+            case 3:
+                return new Spaceship(global) {
+                    @Override
+                    public Sync run(final Spaceships global) throws Exception {
+                        final Spaceship self = this;
+                        return global.sb.queryForUpdate(SpatialQueries.range(getAABB(), global.range), SpatialQueries.equals(global.sb.getElement(token)), new SpatialSetVisitor<Spaceship>() {
+                            @Override
+                            public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
+                                process(resultReadOnly);
+
+                                final ElementUpdater<Spaceship> updater = resultForUpdate.iterator().next();
+                                assert updater.elem() == self; // Spaceship.this;
+
+                                move(global);
+                                updater.update(getAABB());
+                            }
+                        });
+                    }
+                };
+            case 4:
+                return new Spaceship(global) {
+                    @Override
+                    public Sync run(final Spaceships global) throws Exception {
+                        return global.sb.query(SpatialQueries.range(getAABB(), global.range), new SpatialSetVisitor<Spaceship>() {
+                            @Override
+                            public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
+                                process(resultReadOnly);
+                            }
+                        });
+                    }
+                };
+            default:
+                return null;
+        }
+    }
+    private static final double ATTRACTION = 200.0;
+    private static final double REJECTION = 300.0;
+    private static final double SPEED_LIMIT = 10.0;
+    
     private double x;
     private double y;
     private double vx;
     private double vy;
     private volatile int neighbors;
-    private SpatialToken token;
+    protected SpatialToken token;
+    private double dvx;
+    private double dvy;
     private final AtomicInteger neighborCounter = new AtomicInteger();
 
     public Spaceship(Spaceships global) {
         final RandSpatial random = global.random;
+
         x = random.randRange(global.bounds.min(X), global.bounds.max(X));
         y = random.randRange(global.bounds.min(Y), global.bounds.max(Y));
 
@@ -42,6 +116,69 @@ public class Spaceship {
         setVelocityDir(direction, speed);
     }
 
+    public abstract Sync run(Spaceships global) throws Exception;
+
+    protected void process(Set<Spaceship> neighbors) {
+        final int n = neighbors.size();
+        this.neighbors = n;
+
+        dvx = 0.0;
+        dvy = 0.0;
+
+        if (n > 1) {
+            for (Spaceship s : neighbors) {
+                if (s == this)
+                    continue;
+                final double dx = s.x - x;
+                final double dy = s.y - y;
+                final double d = mag(dx, dy);
+                final double udx = dx / d;
+                final double udy = dy / d;
+
+                double attraction = ATTRACTION / (d * d);
+                double rejection = REJECTION / (d * d * d);
+
+                dvx += (attraction - rejection) * udx;
+                dvy += (attraction - rejection) * udx;
+            }
+        }
+    }
+
+    public void move(Spaceships global) {
+        final AABB bounds = global.bounds;
+
+        final double alpha = 0.8;
+        vx += alpha * dvx;
+        vy += alpha * dvy;
+        limitSpeed();
+        
+        if ((x + vx) > bounds.max(X) || (x + vx) < bounds.min(X))
+            vx = -vx;
+        if ((y + vy) > bounds.max(Y) || (y + vy) < bounds.min(Y))
+            vy = -vy;
+
+        x += vx;
+        y += vy;
+    }
+
+    private void setVelocityDir(double direction, double speed) {
+        vx = speed * cos(direction);
+        vy = speed * sin(direction);
+        limitSpeed();
+    }
+
+    private void limitSpeed() {
+        final double speed = mag(vx, vy);
+        if(speed > SPEED_LIMIT) {
+            vx = vx/speed*SPEED_LIMIT;
+            vy = vy/speed*SPEED_LIMIT;
+        }
+    }
+    
+    private double mag(double x, double y) {
+        return Math.sqrt(x*x + y*y);
+    }
+    
     public AABB getAABB() {
         final MutableAABB aabb = AABB.create(2);
         getAABB(aabb);
@@ -82,101 +219,5 @@ public class Spaceship {
     void resetNeighbors() {
         neighbors = neighborCounter.get();
         neighborCounter.set(0);
-    }
-
-    public void run1(final Spaceships global) throws Exception {
-        resetNeighbors();
-        move(global);
-        final Sync sync = global.sb.update(token, getAABB());
-        // sync.join();
-    }
-
-    public void run2(final Spaceships global) throws Exception {
-        final Sync sync = global.sb.query(SpatialQueries.range(getAABB(), global.range), new SpatialSetVisitor<Spaceship>() {
-            @Override
-            public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
-                process(resultReadOnly);
-
-                global.sb.update(token, new UpdateVisitor<Spaceship>() {
-
-                    @Override
-                    public AABB visit(Spaceship elem) {
-                        move(global);
-                        return getAABB();
-                    }
-                });
-            }
-        });
-        //sync.join();
-    }
-
-    public void run3(final Spaceships global) throws Exception {
-        final Sync sync = global.sb.queryForUpdate(SpatialQueries.range(getAABB(), global.range), SpatialQueries.equals(global.sb.getElement(token)), new SpatialSetVisitor<Spaceship>() {
-            @Override
-            public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
-                process(resultReadOnly);
-
-                final ElementUpdater<Spaceship> updater = resultForUpdate.iterator().next();
-                assert updater.elem() == Spaceship.this;
-                
-                move(global);
-                updater.update(getAABB());
-            }
-        });
-        //sync.join();
-    }
-
-    public void run4(final Spaceships global) throws Exception {
-        final Sync sync = global.sb.query(SpatialQueries.range(getAABB(), global.range), new SpatialSetVisitor<Spaceship>() {
-            @Override
-            public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
-                process(resultReadOnly);
-            }
-        });
-        //sync.join();
-    }
-
-    private void process(Set<Spaceship> neighbors) {
-        final int n = neighbors.size();
-        this.neighbors = n;
-        double tx = 0;
-        double ty = 0;
-
-        if (n > 1) {
-            for (Spaceship s : neighbors) {
-                tx += s.x;
-                ty += s.y;
-            }
-
-            tx /= n;
-            double dx = tx - x;
-            double dy = ty - y;
-
-            double alpha = 0.2;
-//                    vx = (1 - alpha) * vx - alpha * 0.5 * dx;
-//                    if (Math.abs(vx) > 10)
-//                        vx = Math.signum(vx) * 10;
-//
-//                    vy = (1 - alpha) * vy - alpha * 0.5 * dy;
-//                    if (Math.abs(vy) > 10)
-//                        vy = Math.signum(vy) * 10;
-        }
-    }
-
-    private void setVelocityDir(double direction, double speed) {
-        vx = speed * cos(direction);
-        vy = speed * sin(direction);
-    }
-
-    public void move(Spaceships global) {
-        final AABB bounds = global.bounds;
-
-        if ((x + vx) > bounds.max(X) || (x + vx) < bounds.min(X))
-            vx = -vx;
-        if ((y + vy) > bounds.max(Y) || (y + vy) < bounds.min(Y))
-            vy = -vy;
-
-        x += vx;
-        y += vy;
     }
 }
