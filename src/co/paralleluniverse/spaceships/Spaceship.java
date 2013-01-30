@@ -12,6 +12,7 @@ import co.paralleluniverse.spacebase.MutableAABB;
 import co.paralleluniverse.spacebase.SpatialQueries;
 import co.paralleluniverse.spacebase.SpatialSetVisitor;
 import co.paralleluniverse.spacebase.SpatialToken;
+import co.paralleluniverse.spacebase.SpatialVisitor;
 import co.paralleluniverse.spacebase.Sync;
 import co.paralleluniverse.spacebase.UpdateVisitor;
 import static java.lang.Math.cos;
@@ -31,12 +32,36 @@ public abstract class Spaceship {
                 return new Spaceship(global) {
                     @Override
                     public Sync run(final Spaceships global) throws Exception {
-                        resetNeighbors();
+                        resetNeighborCounter();
                         move(global);
                         return global.sb.update(token, getAABB());
                     }
                 };
             case 2:
+                return new Spaceship(global) {
+                    @Override
+                    public Sync run(final Spaceships global) throws Exception {
+                        return global.sb.query(SpatialQueries.range(getAABB(), global.range), new SpatialVisitor<Spaceship>() {
+                            @Override
+                            public void visit(Spaceship elem, SpatialToken token) {
+                                process(elem);
+                            }
+
+                            @Override
+                            public void done() {
+                                global.sb.update(token, new UpdateVisitor<Spaceship>() {
+                                    @Override
+                                    public AABB visit(Spaceship elem) {
+                                        resetNeighborCounter();
+                                        move(global);
+                                        return getAABB();
+                                    }
+                                });
+                            }
+                        });
+                    }
+                };
+            case 3:
                 return new Spaceship(global) {
                     @Override
                     public Sync run(final Spaceships global) throws Exception {
@@ -56,7 +81,7 @@ public abstract class Spaceship {
                         });
                     }
                 };
-            case 3:
+            case 4:
                 return new Spaceship(global) {
                     @Override
                     public Sync run(final Spaceships global) throws Exception {
@@ -75,7 +100,7 @@ public abstract class Spaceship {
                         });
                     }
                 };
-            case 4:
+            case 5:
                 return new Spaceship(global) {
                     @Override
                     public Sync run(final Spaceships global) throws Exception {
@@ -91,10 +116,9 @@ public abstract class Spaceship {
                 return null;
         }
     }
-    private static final double ATTRACTION = 200.0;
-    private static final double REJECTION = 300.0;
+    private static final double ATTRACTION = 300.0;
+    private static final double REJECTION = 350.0;
     private static final double SPEED_LIMIT = 10.0;
-    
     private double x;
     private double y;
     private double vx;
@@ -127,21 +151,32 @@ public abstract class Spaceship {
 
         if (n > 1) {
             for (Spaceship s : neighbors) {
-                if (s == this)
+                if(s == this)
                     continue;
-                final double dx = s.x - x;
-                final double dy = s.y - y;
-                final double d = mag(dx, dy);
-                final double udx = dx / d;
-                final double udy = dy / d;
-
-                double attraction = ATTRACTION / (d * d);
-                double rejection = REJECTION / (d * d * d);
-
-                dvx += (attraction - rejection) * udx;
-                dvy += (attraction - rejection) * udx;
+                processNeighbor(s);
             }
         }
+    }
+
+    protected void process(Spaceship s) {
+        if (s == this)
+            return;
+        incNeighbors();
+        processNeighbor(s);
+    }
+    
+    protected void processNeighbor(Spaceship s) {
+        final double dx = s.x - x;
+        final double dy = s.y - y;
+        final double d = mag(dx, dy);
+        final double udx = dx / d;
+        final double udy = dy / d;
+
+        double attraction = Math.min(ATTRACTION / (d * d), ATTRACTION);
+        double rejection = Math.min(REJECTION / (d * d * d), REJECTION);
+
+        dvx += (attraction - rejection) * udx;
+        dvy += (attraction - rejection) * udy;
     }
 
     public void move(Spaceships global) {
@@ -151,7 +186,7 @@ public abstract class Spaceship {
         vx += alpha * dvx;
         vy += alpha * dvy;
         limitSpeed();
-        
+
         if ((x + vx) > bounds.max(X) || (x + vx) < bounds.min(X))
             vx = -vx;
         if ((y + vy) > bounds.max(Y) || (y + vy) < bounds.min(Y))
@@ -169,16 +204,16 @@ public abstract class Spaceship {
 
     private void limitSpeed() {
         final double speed = mag(vx, vy);
-        if(speed > SPEED_LIMIT) {
-            vx = vx/speed*SPEED_LIMIT;
-            vy = vy/speed*SPEED_LIMIT;
+        if (speed > SPEED_LIMIT) {
+            vx = vx / speed * SPEED_LIMIT;
+            vy = vy / speed * SPEED_LIMIT;
         }
     }
-    
+
     private double mag(double x, double y) {
-        return Math.sqrt(x*x + y*y);
+        return Math.sqrt(x * x + y * y);
     }
-    
+
     public AABB getAABB() {
         final MutableAABB aabb = AABB.create(2);
         getAABB(aabb);
@@ -204,6 +239,10 @@ public abstract class Spaceship {
         return neighbors;
     }
 
+    protected void resetNeighbors() {
+        this.neighbors = 0;
+    }
+    
     public SpatialToken getToken() {
         return token;
     }
@@ -216,8 +255,9 @@ public abstract class Spaceship {
         neighborCounter.incrementAndGet();
     }
 
-    void resetNeighbors() {
+    void resetNeighborCounter() {
         neighbors = neighborCounter.get();
         neighborCounter.set(0);
     }
+    
 }

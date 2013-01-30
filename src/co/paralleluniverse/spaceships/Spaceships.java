@@ -20,6 +20,7 @@ import co.paralleluniverse.spaceships.render.GLPort;
 import java.io.FileReader;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -63,12 +64,14 @@ public class Spaceships {
         }
     }
     //
+    private static final int CLEANUP_THREADS = 2;
     private final GLPort.Toolkit toolkit;
     public final int mode;
     private final int N;
     private final int dim;
     public final AABB bounds;
     public final double speedVariance;
+    public final boolean parallel;
     public final boolean async;
     public final double range;
     private final ExecutorService executor;
@@ -78,6 +81,7 @@ public class Spaceships {
 
     public Spaceships(Properties props) {
         this.dim = 2;
+        this.parallel = Boolean.parseBoolean(props.getProperty("parallel", "false"));
         this.async = Boolean.parseBoolean(props.getProperty("async", "true"));
         double b = Double.parseDouble(props.getProperty("world-length", "20000"));
         this.bounds = createDimAABB(-b / 2, b / 2, -b / 2, b / 2, -b / 2, b / 2);
@@ -90,17 +94,20 @@ public class Spaceships {
         System.out.println("World bounds: " + bounds);
         System.out.println("N: " + N);
 
-        final int numThreads = Integer.parseInt(props.getProperty("io-threads", "2"));
-        this.executor = new ThreadPoolExecutor(numThreads, numThreads, 0L, TimeUnit.MILLISECONDS, new SynchronousQueue<Runnable>(), new RejectedExecutionHandler() {
-            @Override
-            public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
-                try {
-                    executor.getQueue().put(r);
-                } catch (InterruptedException ex) {
-                    throw new RuntimeException(ex);
+         if (!parallel) {
+            final int numThreads = Integer.parseInt(props.getProperty("parallelism", "2")) - CLEANUP_THREADS;
+            this.executor = new ThreadPoolExecutor(numThreads, numThreads, 0L, TimeUnit.MILLISECONDS, new SynchronousQueue<Runnable>(), new RejectedExecutionHandler() {
+                @Override
+                public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
+                    try {
+                        executor.getQueue().put(r);
+                    } catch (InterruptedException ex) {
+                        throw new RuntimeException(ex);
+                    }
                 }
-            }
-        });
+            });
+        } else
+            this.executor = null;
 
         this.random = new RandSpatial();
 
@@ -118,7 +125,6 @@ public class Spaceships {
         final boolean optimistic = Boolean.parseBoolean(props.getProperty("optimistic", "true"));
         final int optimisticHeight = Integer.parseInt(props.getProperty("optimistic-height", "1"));
         final int optimisticRetryLimit = Integer.parseInt(props.getProperty("optimistic-retry-limit", "3"));
-        final boolean parallel = Boolean.parseBoolean(props.getProperty("parallel", "false"));
         final int parallelism = Integer.parseInt(props.getProperty("parallelism", "2"));
         final boolean compressed = Boolean.parseBoolean(props.getProperty("compressed", "false"));
         final boolean singlePrecision = Boolean.parseBoolean(props.getProperty("single-precision", "false"));
@@ -139,7 +145,7 @@ public class Spaceships {
         if (parallel)
             builder.setExecutor(SpaceBaseExecutors.parallel(parallelism));
         else
-            builder.setExecutor(SpaceBaseExecutors.concurrent(parallelism));
+            builder.setExecutor(SpaceBaseExecutors.concurrent(CLEANUP_THREADS));
 
         if (optimistic)
             builder.setOptimisticLocking(optimisticHeight, optimisticRetryLimit);
@@ -199,27 +205,37 @@ public class Spaceships {
             } else {
                 for (int i = 0; i < N; i++) {
                     final Spaceship s = ships[i];
-                    final Sync sync = s.run(Spaceships.this);
-                    // sync.join();
+                    if (executor == null) {
+                        final Sync sync = s.run(Spaceships.this);
+                        // sync.join();
+                    } else {
+                        executor.submit(new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    final Sync sync = s.run(Spaceships.this);
+                                    // sync.join();
+                                } catch (Exception ex) {
+                                    ex.printStackTrace();
+                                    System.exit(1);
+                                }
+                            }
+                        });
+                    }
                 }
 
-                if(mode == 4)
+                if (mode == 5) {
+                    System.out.println("XXX 11: " + millis(start));
+                    sb.joinAllPendingOperations();
                     updateAll();
+                }
             }
 
             System.out.println("XXX 11: " + millis(start));
 
             sb.joinAllPendingOperations();
 
-            System.out.println("XXX 22: " + millis(start));
-
-            final int ql = sb.getQueueLength();
-            while (sb.getQueueLength() > 20) {
-                Thread.sleep(5);
-            }
-            System.out.println("XXX: " + millis(start) + " ql: " + ql + " ql2: " + sb.getQueueLength());
-            
-            // System.out.println("==== " + sb.size());
+            System.out.println("XXX: " + millis(start) + " queue: " + sb.getQueueLength());
         }
     }
 
