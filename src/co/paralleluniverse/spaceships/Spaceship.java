@@ -26,10 +26,22 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public abstract class Spaceship {
     public static Spaceship create(Spaceships global) {
-        final int mode = global.mode;
+        return create(global, global.mode);
+    }
+    
+    public static String description(int mode) {
+        return create(null, mode).description();
+    }
+    
+    private static Spaceship create(Spaceships global, int mode) {
         switch (mode) {
             case 1:
                 return new Spaceship(global) {
+                    @Override
+                    public String description() {
+                        return "Join to count neighbors, and then a global update.";
+                    }
+
                     @Override
                     public Sync run(final Spaceships global) throws Exception {
                         resetNeighborCounter();
@@ -39,6 +51,11 @@ public abstract class Spaceship {
                 };
             case 2:
                 return new Spaceship(global) {
+                    @Override
+                    public String description() {
+                        return "Read (non-set) query to process neighbors, and an update in done()";
+                    }
+                    
                     @Override
                     public Sync run(final Spaceships global) throws Exception {
                         return global.sb.query(SpatialQueries.range(getAABB(), global.range), new SpatialVisitor<Spaceship>() {
@@ -64,6 +81,11 @@ public abstract class Spaceship {
             case 3:
                 return new Spaceship(global) {
                     @Override
+                    public String description() {
+                        return "Read set query to process neighbors, and an update in visit()";
+                    }
+                    
+                    @Override
                     public Sync run(final Spaceships global) throws Exception {
                         return global.sb.query(SpatialQueries.range(getAABB(), global.range), new SpatialSetVisitor<Spaceship>() {
                             @Override
@@ -84,6 +106,11 @@ public abstract class Spaceship {
             case 4:
                 return new Spaceship(global) {
                     @Override
+                    public String description() {
+                        return "Read/update set query to process neighbors, and update with updater";
+                    }
+                    
+                    @Override
                     public Sync run(final Spaceships global) throws Exception {
                         final Spaceship self = this;
                         return global.sb.queryForUpdate(SpatialQueries.range(getAABB(), global.range), SpatialQueries.equals(global.sb.getElement(token)), new SpatialSetVisitor<Spaceship>() {
@@ -102,6 +129,11 @@ public abstract class Spaceship {
                 };
             case 5:
                 return new Spaceship(global) {
+                    @Override
+                    public String description() {
+                        return "Read set query to process neighbors, and then a global update.";
+                    }
+                    
                     @Override
                     public Sync run(final Spaceships global) throws Exception {
                         return global.sb.query(SpatialQueries.range(getAABB(), global.range), new SpatialSetVisitor<Spaceship>() {
@@ -130,6 +162,9 @@ public abstract class Spaceship {
     private final AtomicInteger neighborCounter = new AtomicInteger();
 
     public Spaceship(Spaceships global) {
+        if(global == null)
+            return; 
+        
         final RandSpatial random = global.random;
 
         x = random.randRange(global.bounds.min(X), global.bounds.max(X));
@@ -142,6 +177,8 @@ public abstract class Spaceship {
 
     public abstract Sync run(Spaceships global) throws Exception;
 
+    public abstract String description();
+
     protected void process(Set<Spaceship> neighbors) {
         final int n = neighbors.size();
         this.neighbors = n;
@@ -151,7 +188,7 @@ public abstract class Spaceship {
 
         if (n > 1) {
             for (Spaceship s : neighbors) {
-                if(s == this)
+                if (s == this)
                     continue;
                 processNeighbor(s);
             }
@@ -164,7 +201,7 @@ public abstract class Spaceship {
         incNeighbors();
         processNeighbor(s);
     }
-    
+
     protected void processNeighbor(Spaceship s) {
         final double dx = s.x - x;
         final double dy = s.y - y;
@@ -242,7 +279,7 @@ public abstract class Spaceship {
     protected void resetNeighbors() {
         this.neighbors = 0;
     }
-    
+
     public SpatialToken getToken() {
         return token;
     }
@@ -259,5 +296,4 @@ public abstract class Spaceship {
         neighbors = neighborCounter.get();
         neighborCounter.set(0);
     }
-    
 }

@@ -20,7 +20,6 @@ import co.paralleluniverse.spaceships.render.GLPort;
 import java.io.FileReader;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -74,7 +73,7 @@ public class Spaceships {
     public final boolean parallel;
     public final boolean async;
     public final double range;
-    private final ExecutorService executor;
+    private final ThreadPoolExecutor executor;
     public final RandSpatial random;
     private final Spaceship[] ships;
     public final SpaceBase<Spaceship> sb;
@@ -90,7 +89,7 @@ public class Spaceships {
         this.speedVariance = Double.parseDouble(props.getProperty("speed-variance", "1"));
         this.range = Double.parseDouble(props.getProperty("radar-range", "10"));
 
-        System.out.println("===== MODE: " + mode + " =======");
+        System.out.println("===== MODE: " + mode + ": " + Spaceship.description(mode) + " =======");
         System.out.println("World bounds: " + bounds);
         System.out.println("N: " + N);
 
@@ -235,7 +234,7 @@ public class Spaceships {
 
             sb.joinAllPendingOperations();
 
-            System.out.println("XXX: " + millis(start) + " queue: " + sb.getQueueLength());
+            System.out.println("XXX: " + millis(start) + " queue: " + sb.getQueueLength() + (executor != null ? " executorQueue: " + executor.getQueue().size() : ""));
         }
     }
 
