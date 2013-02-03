@@ -18,6 +18,7 @@ import co.paralleluniverse.spacebase.SpatialToken;
 import co.paralleluniverse.spacebase.Sync;
 import co.paralleluniverse.spaceships.render.GLPort;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.PrintStream;
 import java.util.Properties;
@@ -33,30 +34,29 @@ import java.util.concurrent.TimeUnit;
 public class Spaceships {
     public static Spaceships spaceships;
     private static final String METRICS_DIR = System.getProperty("user.home") + "/metrics";
-    private static final PrintStream out = System.out;
 
     /**
      * @param args the command line arguments
      */
     public static void main(String[] args) throws Exception {
-        out.println("COMPILER: " + System.getProperty("java.vm.name"));
-        out.println("VERSION: " + System.getProperty("java.version"));
-        out.println("OS: " + System.getProperty("os.name"));
-        out.println("PROCESSORS: " + Runtime.getRuntime().availableProcessors());
-        out.println();
+        System.out.println("COMPILER: " + System.getProperty("java.vm.name"));
+        System.out.println("VERSION: " + System.getProperty("java.version"));
+        System.out.println("OS: " + System.getProperty("os.name"));
+        System.out.println("PROCESSORS: " + Runtime.getRuntime().availableProcessors());
+        System.out.println();
 
         Properties props = new Properties();
         props.load(new FileReader("spaceships.properties"));
 
-        out.println("MARKER: " + props.getProperty("MARKER"));
+        System.out.println("MARKER: " + props.getProperty("MARKER"));
 
         // dumpAfter(180);
 
-        out.println("Initializing...");
+        System.out.println("Initializing...");
         spaceships = new Spaceships(props);
 
 
-        out.println("Running...");
+        System.out.println("Running...");
         try {
             spaceships.run();
             Thread.sleep(Long.MAX_VALUE);
@@ -69,7 +69,8 @@ public class Spaceships {
     //
     private static final int CLEANUP_THREADS = 2;
     private final File metricsDir;
-    private final PrintStream timeWriter;
+    private final PrintStream configStream;
+    private final PrintStream timeStream;
     private final GLPort.Toolkit toolkit;
     public final int mode;
     private final int N;
@@ -95,22 +96,29 @@ public class Spaceships {
         this.speedVariance = Double.parseDouble(props.getProperty("speed-variance", "1"));
         this.range = Double.parseDouble(props.getProperty("radar-range", "10"));
 
-        out.println("===== MODE: " + mode + ": " + Spaceship.description(mode) + " =======");
-        out.println("World bounds: " + bounds);
-        out.println("N: " + N);
+        if (props.getProperty("dir") != null) {
+            this.metricsDir = new File(System.getProperty("user.home") + "/" + props.getProperty("dir"));
 
+            if (metricsDir.isDirectory()) {
+                for (File file : metricsDir.listFiles())
+                    file.delete();
+            }
+            metricsDir.mkdir();
 
-        this.metricsDir = new File(METRICS_DIR);
-        
-        if(metricsDir.isDirectory()) {
-            for(File file : metricsDir.listFiles())
-                file.delete();
+            final File configFile = new File(metricsDir, "config.txt");
+            this.configStream = new PrintStream(new FileOutputStream(configFile), true);
+
+            final File timeFile = new File(metricsDir, "times.csv");
+            this.timeStream = new PrintStream(new FileOutputStream(timeFile), true);
+        } else {
+            metricsDir = null;
+            configStream = null;
+            timeStream = null;
         }
-        metricsDir.mkdir();
 
-        final File timeFile = new File(METRICS_DIR, "times.csv");
-
-        this.timeWriter = new PrintStream(timeFile);
+        println("===== MODE: " + mode + ": " + Spaceship.description(mode) + " =======");
+        println("World bounds: " + bounds);
+        println("N: " + N);
 
         if (!parallel) {
             final int numThreads = Integer.parseInt(props.getProperty("parallelism", "2")) - CLEANUP_THREADS;
@@ -136,7 +144,7 @@ public class Spaceships {
         this.sb = initSpaceBase(props);
         toolkit = GLPort.Toolkit.valueOf(props.getProperty("ui-component", "NEWT").toUpperCase());
 
-        out.println("UI Component: " + toolkit);
+        println("UI Component: " + toolkit);
     }
 
     private SpaceBase<Spaceship> initSpaceBase(Properties props) {
@@ -148,15 +156,15 @@ public class Spaceships {
         final boolean singlePrecision = Boolean.parseBoolean(props.getProperty("single-precision", "false"));
         final int nodeWidth = Integer.parseInt(props.getProperty("node-width", "10"));
 
-        out.println("Parallel: " + parallel);
-        out.println("Parallelism: " + parallelism);
-        out.println("Optimistic: " + optimistic);
-        out.println("Optimistic height: " + optimisticHeight);
-        out.println("Optimistic retry limit: " + optimisticRetryLimit);
-        out.println("Node width: " + nodeWidth);
-        out.println("Compressed: " + compressed);
-        out.println("Single precision: " + singlePrecision);
-        out.println();
+        println("Parallel: " + parallel);
+        println("Parallelism: " + parallelism);
+        println("Optimistic: " + optimistic);
+        println("Optimistic height: " + optimisticHeight);
+        println("Optimistic retry limit: " + optimisticRetryLimit);
+        println("Node width: " + nodeWidth);
+        println("Compressed: " + compressed);
+        println("Single precision: " + singlePrecision);
+        println();
 
         SpaceBaseBuilder builder = new SpaceBaseBuilder();
 
@@ -176,7 +184,8 @@ public class Spaceships {
         builder.setNodeWidth(nodeWidth);
 
         builder.setMonitoringType(SpaceBaseBuilder.MonitorType.METRICS); // (SpaceBaseBuilder.MonitorType.JMX); // 
-        com.yammer.metrics.reporting.CsvReporter.enable(metricsDir, 1, TimeUnit.SECONDS);
+        if (metricsDir != null)
+            com.yammer.metrics.reporting.CsvReporter.enable(metricsDir, 1, TimeUnit.SECONDS);
 
         final SpaceBase<Spaceship> space = builder.build("base1");
         return space;
@@ -184,7 +193,7 @@ public class Spaceships {
 
     private void run() throws Exception {
         {
-            out.println("Inserting " + N + " spaceships");
+            System.out.println("Inserting " + N + " spaceships");
             long start = System.nanoTime();
             for (int i = 0; i < N; i++) {
                 final Spaceship s = ships[i];
@@ -194,15 +203,15 @@ public class Spaceships {
                 token.join();
                 s.setToken(token);
             }
-            out.println("Inserted " + N + " things in " + millis(start));
+            System.out.println("Inserted " + N + " things in " + millis(start));
         }
 
 //        out.println("Sleeping for 5 seconds....");
 //        Thread.sleep(5000);
 
         GLPort port = new GLPort(toolkit, N, sb, bounds);
-        timeWriter.println("# time, millis, millis1, millis0");
-        
+        timeStream.println("# time, millis, millis1, millis0");
+
         sb.setCurrentThreadAsynchronous(async);
         for (int k = 0;; k++) {
             long start = System.nanoTime();
@@ -253,9 +262,9 @@ public class Spaceships {
             sb.joinAllPendingOperations();
 
             millis = millis(start);
-            timeWriter.println(k + "," + millis + "," + millis1 + "," + millis0);
-            timeWriter.flush();
-            out.println("XXX: " + millis + " queue: " + sb.getQueueLength() + (executor != null ? " executorQueue: " + executor.getQueue().size() : ""));
+            if (timeStream != null)
+                timeStream.println(k + "," + millis + "," + millis1 + "," + millis0);
+            System.out.println("XXX: " + millis + " queue: " + sb.getQueueLength() + (executor != null ? " executorQueue: " + executor.getQueue().size() : ""));
         }
     }
 
@@ -291,5 +300,15 @@ public class Spaceships {
     private static void dump() {
         if (Debug.isDebug())
             Debug.getGlobalFlightRecorder().dump(Debug.getDumpFile());
+    }
+
+    private void println() {
+        println("");
+    }
+
+    private void println(String str) {
+        if (configStream != null)
+            configStream.println(str);
+        System.out.println(str);
     }
 }
