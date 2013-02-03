@@ -93,7 +93,7 @@ public class Spaceships {
         System.out.println("World bounds: " + bounds);
         System.out.println("N: " + N);
 
-         if (!parallel) {
+        if (!parallel) {
             final int numThreads = Integer.parseInt(props.getProperty("parallelism", "2")) - CLEANUP_THREADS;
             this.executor = new ThreadPoolExecutor(numThreads, numThreads, 0L, TimeUnit.MILLISECONDS, new SynchronousQueue<Runnable>(), new RejectedExecutionHandler() {
                 @Override
@@ -194,13 +194,6 @@ public class Spaceships {
                         elem2.incNeighbors();
                     }
                 }).join();
-
-                if (sb.getQueueLength() > 20)
-                    System.out.println("???");
-
-                System.out.println("XXX 00: " + millis(start));
-
-                updateAll();
             } else {
                 for (int i = 0; i < N; i++) {
                     final Spaceship s = ships[i];
@@ -222,12 +215,12 @@ public class Spaceships {
                         });
                     }
                 }
+            }
 
-                if (mode == 5) {
-                    System.out.println("XXX 11: " + millis(start));
-                    sb.joinAllPendingOperations();
-                    updateAll();
-                }
+            if (mode <= 2) {
+                sb.joinAllPendingOperations();
+                System.out.println("XXX 00: " + millis(start));
+                updateAll();
             }
 
             System.out.println("XXX 11: " + millis(start));
