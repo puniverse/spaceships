@@ -210,7 +210,8 @@ public class Spaceships {
 //        Thread.sleep(5000);
 
         GLPort port = new GLPort(toolkit, N, sb, bounds);
-        timeStream.println("# time, millis, millis1, millis0");
+        if (timeStream != null)
+            timeStream.println("# time, millis, millis1, millis0");
 
         sb.setCurrentThreadAsynchronous(async);
         for (int k = 0;; k++) {
