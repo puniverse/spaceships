@@ -923,6 +923,13 @@ is divided into following sections:
         </propertyfile>
         <antcall target="-maybe-call-dep">
             <param name="call.built.properties" value="${built-jar.properties}"/>
+            <param location="${project.high-scale-lib}" name="call.subproject"/>
+            <param location="${project.high-scale-lib}/build.xml" name="call.script"/>
+            <param name="call.target" value="jar"/>
+            <param name="transfer.built-jar.properties" value="${built-jar.properties}"/>
+        </antcall>
+        <antcall target="-maybe-call-dep">
+            <param name="call.built.properties" value="${built-jar.properties}"/>
             <param location="${project.spacebase}" name="call.subproject"/>
             <param location="${project.spacebase}/build.xml" name="call.script"/>
             <param name="call.target" value="jar"/>
@@ -1410,6 +1417,13 @@ is divided into following sections:
         </propertyfile>
         <antcall target="-maybe-call-dep">
             <param name="call.built.properties" value="${built-clean.properties}"/>
+            <param location="${project.high-scale-lib}" name="call.subproject"/>
+            <param location="${project.high-scale-lib}/build.xml" name="call.script"/>
+            <param name="call.target" value="clean"/>
+            <param name="transfer.built-clean.properties" value="${built-clean.properties}"/>
+        </antcall>
+        <antcall target="-maybe-call-dep">
+            <param name="call.built.properties" value="${built-clean.properties}"/>
             <param location="${project.spacebase}" name="call.subproject"/>
             <param location="${project.spacebase}/build.xml" name="call.script"/>
             <param name="call.target" value="clean"/>
@@ -1420,7 +1434,7 @@ is divided into following sections:
         <delete dir="${build.dir}"/>
         <delete dir="${dist.dir}" followsymlinks="false" includeemptydirs="true"/>
     </target>
-    <target name="-post-clean">
+    <target depends="" name="-post-clean">
         <!-- Empty placeholder for easier customization. -->
         <!-- You can override this target in the ../build.xml file. -->
     </target>
