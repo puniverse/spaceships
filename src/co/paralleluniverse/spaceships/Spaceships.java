@@ -33,7 +33,6 @@ import java.util.concurrent.TimeUnit;
  */
 public class Spaceships {
     public static Spaceships spaceships;
-    private static final String METRICS_DIR = System.getProperty("user.home") + "/metrics";
 
     /**
      * @param args the command line arguments
@@ -183,7 +182,7 @@ public class Spaceships {
         builder.setSinglePrecision(singlePrecision).setCompressed(compressed);
         builder.setNodeWidth(nodeWidth);
 
-        builder.setMonitoringType(SpaceBaseBuilder.MonitorType.METRICS); // (SpaceBaseBuilder.MonitorType.JMX); // 
+        builder.setMonitoringType(SpaceBaseBuilder.MonitorType.JMX); // (SpaceBaseBuilder.MonitorType.METRICS); // 
         if (metricsDir != null)
             com.yammer.metrics.reporting.CsvReporter.enable(metricsDir, 1, TimeUnit.SECONDS);
 
@@ -260,7 +259,14 @@ public class Spaceships {
             millis1 = millis(start);
             //out.println("XXX 11: " + millis(start));
 
-            sb.joinAllPendingOperations();
+            while(sb.getQueueLength() > 10000)
+                Thread.sleep(10);
+            while(sb.getQueueLength() > 1000)
+                Thread.sleep(5);
+            while(sb.getQueueLength() > 200)
+                Thread.sleep(1);
+
+            //Thread.sleep(220); //sb.joinAllPendingOperations();
 
             millis = millis(start);
             if (timeStream != null)
