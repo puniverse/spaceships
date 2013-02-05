@@ -172,6 +172,8 @@ public class Spaceships {
         else
             builder.setExecutor(SpaceBaseExecutors.concurrent(CLEANUP_THREADS));
 
+        builder.setQueueBackpressure(1000);
+        
         if (optimistic)
             builder.setOptimisticLocking(optimisticHeight, optimisticRetryLimit);
         else
@@ -182,7 +184,7 @@ public class Spaceships {
         builder.setSinglePrecision(singlePrecision).setCompressed(compressed);
         builder.setNodeWidth(nodeWidth);
 
-        builder.setMonitoringType(SpaceBaseBuilder.MonitorType.JMX); // (SpaceBaseBuilder.MonitorType.METRICS); // 
+        builder.setMonitoringType(SpaceBaseBuilder.MonitorType.JMX);
         if (metricsDir != null)
             com.yammer.metrics.reporting.CsvReporter.enable(metricsDir, 1, TimeUnit.SECONDS);
 
@@ -259,14 +261,7 @@ public class Spaceships {
             millis1 = millis(start);
             //out.println("XXX 11: " + millis(start));
 
-            while(sb.getQueueLength() > 10000)
-                Thread.sleep(10);
-            while(sb.getQueueLength() > 1000)
-                Thread.sleep(5);
-            while(sb.getQueueLength() > 200)
-                Thread.sleep(1);
-
-            //Thread.sleep(220); //sb.joinAllPendingOperations();
+            //sb.joinAllPendingOperations();
 
             millis = millis(start);
             if (timeStream != null)
