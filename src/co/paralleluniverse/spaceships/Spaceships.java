@@ -49,8 +49,6 @@ public class Spaceships {
 
         System.out.println("MARKER: " + props.getProperty("MARKER"));
 
-        // dumpAfter(180);
-
         System.out.println("Initializing...");
         spaceships = new Spaceships(props);
 

@@ -5,10 +5,8 @@
 package co.paralleluniverse.spaceships.render;
 
 import com.jogamp.opengl.util.glsl.ShaderProgram;
-import java.nio.DoubleBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
-import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;

@@ -36,7 +36,11 @@ import javax.media.opengl.awt.GLCanvas;
 import javax.media.opengl.fixedfunc.GLMatrixFunc;
 
 /**
- *
+ * See: 
+ *   http://www.lighthouse3d.com/tutorials/glsl-core-tutorial/3490-2/
+ *   http://www.arcsynthesis.org/gltut/Positioning/Tut07%20Shared%20Uniforms.html
+ *   http://www.jotschi.de/?p=427
+ * 
  * @author pron
  */
 public class GLPort implements GLEventListener {
@@ -171,7 +175,7 @@ public class GLPort implements GLEventListener {
         this.shaderState = new ProgramState(gl, shaderProgram);
         shaderState.bind(gl);
 
-        portToMvMatrix();
+        //portToMvMatrix();
         pmv.glMatrixMode(GLMatrixFunc.GL_PROJECTION);
         pmv.glLoadIdentity();
 
@@ -215,8 +219,8 @@ public class GLPort implements GLEventListener {
             shaderState.bind(gl);
             vao.bind(gl);
 
-            vertices.reset();
-            colors.reset();
+            vertices.clear();
+            colors.clear();
             final FloatBuffer verticesb = (FloatBuffer) vertices.getBuffer();
             final FloatBuffer colorsb = (FloatBuffer) colors.getBuffer();
             //System.out.println("XXX " + verticeb + " " + port);

@@ -45,8 +45,7 @@ public abstract class Spaceship {
                     @Override
                     public Sync run(final Spaceships global) throws Exception {
                         resetNeighborCounter();
-                        move(global);
-                        return global.sb.update(token, getAABB());
+                        return null;
                     }
                 };
             case 2:
@@ -144,7 +143,7 @@ public abstract class Spaceship {
                         });
                     }
                 };
-            case 7:
+            case 6:
                 return new Spaceship(global) {
                     @Override
                     public String description() {

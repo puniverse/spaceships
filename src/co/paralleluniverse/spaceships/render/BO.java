@@ -16,7 +16,7 @@ import javax.media.opengl.GLES2;
  * @author pron
  */
 public class BO {
-    public static final int sizeOfGLType(int glType) {
+    public static int sizeOfGLType(int glType) {
         switch (glType) { // 29
             // case GL2.GL_BITMAP:
             case GL.GL_BYTE:

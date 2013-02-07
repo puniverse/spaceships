@@ -16,7 +16,6 @@ import javax.media.opengl.GLException;
  * @author pron
  */
 public class VBO {
-
     private static final int vboTarget = GL.GL_ARRAY_BUFFER;
     private final Buffer buffer;
     private final int vbo;
@@ -82,16 +81,14 @@ public class VBO {
         this.stride = components * componentByteSize;
 
         this.buffer = GLBuffers.newDirectGLBuffer(componentType, components * numElements);
-        buffer.limit(buffer.capacity());
-        
+        buffer.clear();
+
         int[] tmp = new int[1];
         gl.glGenBuffers(1, tmp, 0);
         this.vbo = tmp[0];
-        
-        bind(gl);
-        gl.glBufferData(vboTarget, stride*numElements, null, usage);
 
-        //this.written = false;
+        bind(gl);
+        gl.glBufferData(vboTarget, stride * numElements, null, usage);
     }
 
     public Buffer getBuffer() {
@@ -122,21 +119,12 @@ public class VBO {
         bind(gl);
 
         buffer.rewind();
-//        if (!written) {
-//            gl.glBufferData(vboTarget, buffer.remaining() * GLBuffers.sizeOfGLType(componentType), buffer, usage);
-//            written = true;
-//        } else
-            gl.glBufferSubData(vboTarget, 0, buffer.remaining() * GLBuffers.sizeOfGLType(componentType), buffer);
-        
+        gl.glBufferSubData(vboTarget, 0, buffer.remaining() * GLBuffers.sizeOfGLType(componentType), buffer);
     }
 
     public void write(GL gl, int offset, int elements) {
         bind(gl);
-//        if (!written)
-//            throw new RuntimeException("VBO must be written once using write() before calling this method");
-
         gl.glBufferSubData(vboTarget, offset * stride, elements * stride, Buffers.slice(buffer, offset * components, elements * components));
-                //slice(offset, elements));
     }
 
     public final int getSizeInBytes() {
@@ -144,11 +132,10 @@ public class VBO {
         return componentByteSize * (buffer.position() == 0 ? buffer.limit() : buffer.position());
     }
 
-    public void reset() {
-        buffer.limit(buffer.capacity());
-        buffer.rewind();
+    public void clear() {
+        buffer.clear();
     }
-    
+
     public void rewind() {
         buffer.rewind();
     }
