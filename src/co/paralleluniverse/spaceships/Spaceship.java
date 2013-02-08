@@ -137,11 +137,13 @@ public abstract class Spaceship {
                             public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
                                 process(resultReadOnly);
 
-                                final ElementUpdater<Spaceship> updater = resultForUpdate.iterator().next();
-                                assert updater.elem() == self; // Spaceship.this;
+                                assert resultForUpdate.size() <= 1;
+                                for (final ElementUpdater<Spaceship> updater : resultForUpdate) {
+                                    assert updater.elem() == self; // Spaceship.this;
 
-                                move(global, global.currentTime());
-                                updater.update(getAABB());
+                                    move(global, global.currentTime());
+                                    updater.update(getAABB());
+                                }
                             }
                         });
                     }
