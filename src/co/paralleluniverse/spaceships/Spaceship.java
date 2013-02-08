@@ -18,6 +18,7 @@ import co.paralleluniverse.spacebase.UpdateVisitor;
 import static java.lang.Math.cos;
 import static java.lang.Math.sin;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -74,6 +75,8 @@ public abstract class Spaceship {
 
                     @Override
                     public Sync run(final Spaceships global) throws Exception {
+                        ax = 0.0;
+                        ay = 0.0;
                         return global.sb.query(SpatialQueries.range(getAABB(), global.range), new SpatialVisitor<Spaceship>() {
                             @Override
                             public void visit(Spaceship elem, SpatialToken token) {
@@ -86,7 +89,7 @@ public abstract class Spaceship {
                                     @Override
                                     public AABB visit(Spaceship elem) {
                                         resetNeighborCounter();
-                                        move(global);
+                                        move(global, global.currentTime());
                                         return getAABB();
                                     }
                                 });
@@ -111,7 +114,7 @@ public abstract class Spaceship {
                                 global.sb.update(token, new UpdateVisitor<Spaceship>() {
                                     @Override
                                     public AABB visit(Spaceship elem) {
-                                        move(global);
+                                        move(global, global.currentTime());
                                         return getAABB();
                                     }
                                 });
@@ -137,7 +140,7 @@ public abstract class Spaceship {
                                 final ElementUpdater<Spaceship> updater = resultForUpdate.iterator().next();
                                 assert updater.elem() == self; // Spaceship.this;
 
-                                move(global);
+                                move(global, global.currentTime());
                                 updater.update(getAABB());
                             }
                         });
@@ -161,7 +164,7 @@ public abstract class Spaceship {
                                     @Override
                                     public AABB visit(Spaceship elem) {
                                         resetNeighborCounter();
-                                        move(global);
+                                        move(global, global.currentTime());
                                         return getAABB();
                                     }
                                 });
@@ -173,17 +176,20 @@ public abstract class Spaceship {
                 return null;
         }
     }
-    private static final double ATTRACTION = 300.0;
-    private static final double REJECTION = 350.0;
-    private static final double SPEED_LIMIT = 10.0;
-    private double x;
-    private double y;
-    private double vx;
-    private double vy;
+    private static final double ATTRACTION = 2000.0;
+    private static final double REJECTION = 8000.0;
+    private static final double SPEED_LIMIT = 50.0;
+    private static final double SPEED_BOUNCE_DAMPING = 0.9;
+    private static final double MIN_PROXIMITY = 4;
+    private long lastMoved = -1L;
+    protected double x;
+    protected double y;
+    protected double vx;
+    protected double vy;
+    protected double ax;
+    protected double ay;
     private volatile int neighbors;
     protected SpatialToken token;
-    private double dvx;
-    private double dvy;
     private final AtomicInteger neighborCounter = new AtomicInteger();
 
     public Spaceship(Spaceships global) {
@@ -208,8 +214,8 @@ public abstract class Spaceship {
         final int n = neighbors.size();
         this.neighbors = n;
 
-        dvx = 0.0;
-        dvy = 0.0;
+        ax = 0.0;
+        ay = 0.0;
 
         if (n > 1) {
             for (Spaceship s : neighbors) {
@@ -234,28 +240,42 @@ public abstract class Spaceship {
         final double udx = dx / d;
         final double udy = dy / d;
 
-        double attraction = Math.min(ATTRACTION / (d * d), ATTRACTION);
-        double rejection = Math.min(REJECTION / (d * d * d), REJECTION);
+        double attraction = 0.0;
+        double rejection = 0.0;
 
-        dvx += (attraction - rejection) * udx;
-        dvy += (attraction - rejection) * udy;
+        if (d > MIN_PROXIMITY) {
+            attraction = ATTRACTION / (d * d);
+            rejection = REJECTION / (d * d * d);
+        }
+
+        ax += (attraction - rejection) * udx;
+        ay += (attraction - rejection) * udy;
     }
 
-    public void move(Spaceships global) {
-        final AABB bounds = global.bounds;
+    public void move(Spaceships global, long currentTime) {
+        final long duration = currentTime - lastMoved;
+        if (lastMoved > 0 & duration > 0) {
+            final AABB bounds = global.bounds;
 
-        final double alpha = 0.8;
-        vx += alpha * dvx;
-        vy += alpha * dvy;
-        limitSpeed();
+            vx += ax * duration / TimeUnit.SECONDS.toMillis(1);
+            vy += ay * duration / TimeUnit.SECONDS.toMillis(1);
 
-        if ((x + vx) > bounds.max(X) || (x + vx) < bounds.min(X))
-            vx = -vx;
-        if ((y + vy) > bounds.max(Y) || (y + vy) < bounds.min(Y))
-            vy = -vy;
+            limitSpeed();
 
-        x += vx;
-        y += vy;
+            x += vx * duration / TimeUnit.SECONDS.toMillis(1);
+            y += vy * duration / TimeUnit.SECONDS.toMillis(1);
+            if (x > bounds.max(X) || x < bounds.min(X)) {
+                x = Math.min(x, bounds.max(X));
+                x = Math.max(x, bounds.min(X));
+                vx = -vx * SPEED_BOUNCE_DAMPING;
+            }
+            if (y > bounds.max(Y) || y < bounds.min(Y)) {
+                y = Math.min(y, bounds.max(Y));
+                y = Math.max(y, bounds.min(Y));
+                vy = -vy * SPEED_BOUNCE_DAMPING;
+            }
+        }
+        this.lastMoved = currentTime;
     }
 
     private void setVelocityDir(double direction, double speed) {
@@ -283,10 +303,13 @@ public abstract class Spaceship {
     }
 
     public void getAABB(MutableAABB aabb) {
-        aabb.min(X, x);
-        aabb.max(X, x);
-        aabb.min(Y, y);
-        aabb.max(Y, y);
+        // capture x and y atomically (each)
+        final double _x = x;
+        final double _y = y;
+        aabb.min(X, _x);
+        aabb.max(X, _x);
+        aabb.min(Y, _y);
+        aabb.max(Y, _y);
     }
 
     public double getX() {

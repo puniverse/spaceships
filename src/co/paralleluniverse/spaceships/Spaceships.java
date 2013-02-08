@@ -249,7 +249,7 @@ public class Spaceships {
             }
 
             if (mode <= 2) {
-                sb.joinAllPendingOperations();
+                //sb.joinAllPendingOperations();
                 millis0 = millis(start);
                 //out.println("XXX 00: " + millis(start));
                 updateAll();
@@ -257,10 +257,11 @@ public class Spaceships {
                 millis0 = 0;
 
             millis1 = millis(start);
-            //out.println("XXX 11: " + millis(start));
+            System.out.println("XXX 11: " + millis(start));
 
-            //sb.joinAllPendingOperations();
-
+            if(millis1 < 10)
+                Thread.sleep(10 - (int)millis1);
+            
             millis = millis(start);
             if (timeStream != null)
                 timeStream.println(k + "," + millis + "," + millis1 + "," + millis0);
@@ -272,8 +273,9 @@ public class Spaceships {
         sb.queryForUpdate(SpatialQueries.ALL_QUERY, new SpatialModifyingVisitor<Spaceship>() {
             @Override
             public void visit(ElementUpdater<Spaceship> update) {
+                final long currentTime = currentTime();
                 final Spaceship spaceship = update.elem();
-                spaceship.move(Spaceships.this);
+                spaceship.move(Spaceships.this, currentTime);
                 update.update(spaceship.getAABB());
             }
 
@@ -283,6 +285,10 @@ public class Spaceships {
         });
     }
 
+    long currentTime() {
+        return System.currentTimeMillis();
+    }
+    
     private float millis(long nanoStart) {
         return (float) (System.nanoTime() - nanoStart) / 1000000;
     }

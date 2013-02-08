@@ -36,11 +36,11 @@ import javax.media.opengl.awt.GLCanvas;
 import javax.media.opengl.fixedfunc.GLMatrixFunc;
 
 /**
- * See: 
- *   http://www.lighthouse3d.com/tutorials/glsl-core-tutorial/3490-2/
- *   http://www.arcsynthesis.org/gltut/Positioning/Tut07%20Shared%20Uniforms.html
- *   http://www.jotschi.de/?p=427
- * 
+ * See:
+ * http://www.lighthouse3d.com/tutorials/glsl-core-tutorial/3490-2/
+ * http://www.arcsynthesis.org/gltut/Positioning/Tut07%20Shared%20Uniforms.html
+ * http://www.jotschi.de/?p=427
+ *
  * @author pron
  */
 public class GLPort implements GLEventListener {
@@ -50,6 +50,7 @@ public class GLPort implements GLEventListener {
     private final Toolkit TOOLKIT;
     //
     private static final float KEY_PRESS_TRANSLATE = 10.0f;
+    private final Object window;
     private final int maxItems;
     private final SpaceBase<Spaceship> sb;
     private final AABB bounds;
@@ -112,6 +113,7 @@ public class GLPort implements GLEventListener {
             window.setSize(300, 300);
             window.setTitle("Spaceships");
             window.setVisible(true);
+            this.window = window;
         } else {
             final Component canvas;
 
@@ -138,9 +140,17 @@ public class GLPort implements GLEventListener {
             window.setSize(300, 300);
             window.setTitle("Spaceships");
             window.setVisible(true);
+            this.window = window;
         }
 
         animator.start();
+    }
+
+    private void setTitle(String title) {
+        if (TOOLKIT == Toolkit.NEWT)
+            ((GLWindow)window).setTitle(title);
+        else
+            ((Frame)window).setTitle(title);
     }
 
     @Override
@@ -150,10 +160,10 @@ public class GLPort implements GLEventListener {
 
         final GL3 gl = drawable.getGL().getGL3();
 
-        port.min(X, -150);
-        port.max(X, 150);
-        port.min(Y, -150);
-        port.max(Y, 150);
+        port.min(X, -drawable.getWidth()/2);
+        port.max(X, drawable.getWidth()/2);
+        port.min(Y, -drawable.getHeight()/2);
+        port.max(Y, drawable.getHeight()/2);
         gl.glEnable(gl.GL_VERTEX_PROGRAM_POINT_SIZE);
         gl.glViewport(0, 0, (int) (port.max(X) - port.min(X)), (int) (port.max(Y) - port.min(Y)));
         gl.glClearColor(0, 0, 0, 1);
@@ -263,8 +273,8 @@ public class GLPort implements GLEventListener {
         gl.glViewport(0, 0, width, height);
         port.max(X, port.min(X) + width);
         port.max(Y, port.min(Y) + height);
-        System.out.println("========= " + (port.max(X) - port.min(X)) + "x" + (port.max(X) - port.min(X)) + " =========");
         portToMvMatrix();
+        setTitle("Spaceships " + (port.max(X) - port.min(X)) + "x" + (port.max(Y) - port.min(Y)));
     }
 
     private void movePort(boolean horizontal, double units) {
