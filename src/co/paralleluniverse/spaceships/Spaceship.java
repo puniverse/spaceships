@@ -252,6 +252,8 @@ public abstract class Spaceship {
 
         ax += (attraction - rejection) * udx;
         ay += (attraction - rejection) * udy;
+        
+        assert !Double.isNaN(ax + ay);
     }
 
     public void move(Spaceships global, long currentTime) {
@@ -264,6 +266,8 @@ public abstract class Spaceship {
 
             limitSpeed();
 
+            assert !Double.isNaN(vx + vy);
+            
             x += vx * duration / TimeUnit.SECONDS.toMillis(1);
             y += vy * duration / TimeUnit.SECONDS.toMillis(1);
             if (x > bounds.max(X) || x < bounds.min(X)) {
@@ -276,6 +280,8 @@ public abstract class Spaceship {
                 y = Math.max(y, bounds.min(Y));
                 vy = -vy * SPEED_BOUNCE_DAMPING;
             }
+            
+            assert !Double.isNaN(x + y);
         }
         this.lastMoved = currentTime;
     }
