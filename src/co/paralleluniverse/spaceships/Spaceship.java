@@ -192,6 +192,14 @@ public abstract class Spaceship {
     protected double ay;
     private volatile int neighbors;
     protected SpatialToken token;
+
+    public double getVx() {
+        return vx;
+    }
+
+    public double getVy() {
+        return vy;
+    }
     private final AtomicInteger neighborCounter = new AtomicInteger();
 
     public Spaceship(Spaceships global) {
@@ -284,6 +292,10 @@ public abstract class Spaceship {
             assert !Double.isNaN(x + y);
         }
         this.lastMoved = currentTime;
+    }
+
+    public long getLastMoved() {
+        return lastMoved;
     }
 
     private void setVelocityDir(double direction, double speed) {

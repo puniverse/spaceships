@@ -23,6 +23,7 @@ import java.awt.Component;
 import java.awt.Frame;
 import java.nio.FloatBuffer;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import javax.media.opengl.DebugGL3;
 import javax.media.opengl.GL2ES2;
 import javax.media.opengl.GL3;
@@ -98,7 +99,7 @@ public class GLPort implements GLEventListener {
         }
 
         drawable.addGLEventListener(this);
-        animator = new FPSAnimator(drawable, 60);
+        animator = new FPSAnimator(drawable, 30);
 
         if (TOOLKIT == Toolkit.NEWT) {
             final GLWindow window = (GLWindow) drawable;
@@ -148,9 +149,9 @@ public class GLPort implements GLEventListener {
 
     private void setTitle(String title) {
         if (TOOLKIT == Toolkit.NEWT)
-            ((GLWindow)window).setTitle(title);
+            ((GLWindow) window).setTitle(title);
         else
-            ((Frame)window).setTitle(title);
+            ((Frame) window).setTitle(title);
     }
 
     @Override
@@ -160,24 +161,28 @@ public class GLPort implements GLEventListener {
 
         final GL3 gl = drawable.getGL().getGL3();
 
-        port.min(X, -drawable.getWidth()/2);
-        port.max(X, drawable.getWidth()/2);
-        port.min(Y, -drawable.getHeight()/2);
-        port.max(Y, drawable.getHeight()/2);
+        port.min(X, -drawable.getWidth() / 2);
+        port.max(X, drawable.getWidth() / 2);
+        port.min(Y, -drawable.getHeight() / 2);
+        port.max(Y, drawable.getHeight() / 2);
         gl.glEnable(gl.GL_VERTEX_PROGRAM_POINT_SIZE);
         gl.glViewport(0, 0, (int) (port.max(X) - port.min(X)), (int) (port.max(Y) - port.min(Y)));
         gl.glClearColor(0, 0, 0, 1);
 
         ShaderCode vertexShader = ShaderCode.create(gl, gl.GL_VERTEX_SHADER, this.getClass(), "shader", null, "vertex", false);
+        ShaderCode geometryShader = ShaderCode.create(gl, gl.GL_GEOMETRY_SHADER, this.getClass(), "shader", null, "geometry", false);
         ShaderCode fragmentShader = ShaderCode.create(gl, gl.GL_FRAGMENT_SHADER, this.getClass(), "shader", null, "fragment", false);
 
         if (!vertexShader.compile(gl, System.err))
             throw new GLException("Couldn't compile shader: " + vertexShader);
+        if (!geometryShader.compile(gl, System.err))
+            throw new GLException("Couldn't compile shader: " + geometryShader);
         if (!fragmentShader.compile(gl, System.err))
             throw new GLException("Couldn't compile shader: " + fragmentShader);
 
         final ShaderProgram shaderProgram = new ShaderProgram();
         shaderProgram.add(gl, vertexShader, System.err);
+        shaderProgram.add(gl, geometryShader, System.err);
         shaderProgram.add(gl, fragmentShader, System.err);
         if (!shaderProgram.link(gl, System.err))
             throw new GLException("Couldn't link program: " + shaderProgram);
@@ -193,10 +198,10 @@ public class GLPort implements GLEventListener {
         vao.bind(gl);
 
         this.vertices = new VBO(gl, 2, gl.GL_FLOAT, false, maxItems, gl.GL_DYNAMIC_DRAW);
-        this.colors = new VBO(gl, 1, gl.GL_FLOAT, false, maxItems, gl.GL_DYNAMIC_DRAW);
+        this.colors = new VBO(gl, 2, gl.GL_FLOAT, false, maxItems, gl.GL_DYNAMIC_DRAW);
 
         vao.setVertex(gl, "in_Position", vertices);
-        vao.setVertex(gl, "in_Color", colors);
+        vao.setVertex(gl, "in_Vertex", colors);
 
         shaderState.setUniform(gl, "in_Matrix", 4, 4, pmv.glGetMvMatrixf());
         //shaderState.createUBO(gl, "MatrixBlock");
@@ -237,11 +242,19 @@ public class GLPort implements GLEventListener {
             sb.query(SpatialQueries.contained(port), new SpatialSetVisitor<Spaceship>() {
                 @Override
                 public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
+                    float x,y;
+                    final long ct = System.currentTimeMillis();
                     for (Spaceship s : resultReadOnly) {
-                        verticesb.put((float) s.getX());
-                        verticesb.put((float) s.getY());
+                        long duration = ct - s.getLastMoved();
+                        if (s.getLastMoved() > 0 & duration > 0) {
+                            x = (float) (s.getX() + s.getVx() * duration / TimeUnit.SECONDS.toMillis(1));
+                            y = (float) (s.getY() + s.getVy() * duration / TimeUnit.SECONDS.toMillis(1));
+                            verticesb.put((float) s.getX());
+                            verticesb.put((float) s.getY());
 
-                        colorsb.put(Math.min(1.0f, 0.1f + (float) s.getNeighbors() / 10.0f));
+                            colorsb.put(Math.min(1.0f, 0.1f + (float) s.getNeighbors() / 10.0f));
+                            colorsb.put((float) Math.atan2(s.getVx(), s.getVy()));
+                        }
                     }
                 }
             }).join();

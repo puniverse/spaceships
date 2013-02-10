@@ -1,16 +1,15 @@
 #version 330 core
 
 in vec2 in_Position;
-uniform mat4 in_Matrix;
-//uniform MatrixBlock {
-//    uniform mat4 PMatrix;
-//};
-in float in_Color;
+in vec2 in_Vertex;
+
 out vec4 pass_Color;
+out float heading;
 
 void main()
 {
-    gl_Position = in_Matrix * vec4(in_Position, 1.0, 1.0);
-    gl_PointSize = 10;
-    pass_Color = vec4(in_Color, 0.0, 0.0, 1.0);
+    gl_Position = vec4(in_Position, 1.0, 1.0);
+//    gl_PointSize = 10;
+    pass_Color = vec4(in_Vertex[0],0.0, 0.0, 1.0);
+    heading = in_Vertex[1];
 }
