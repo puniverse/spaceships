@@ -48,7 +48,7 @@ uniform mat4 in_Matrix;
         EmitVertex();
 
 
-        gl_Position = in_Matrix * (gl_in[i].gl_Position + RotationMatrix * vec4(-size/10,size*shootLength[0],0,0));
+        gl_Position = in_Matrix * (gl_in[i].gl_Position + RotationMatrix * vec4(-size/10,shootLength[0],0,0));
     //    pass_oColor = pass_Color[0];
 
         // done with the vertex
@@ -59,7 +59,7 @@ uniform mat4 in_Matrix;
         // done with the vertex
         EmitVertex();
 
-        gl_Position = in_Matrix * (gl_in[i].gl_Position + RotationMatrix * vec4(size/10,size*shootLength[0],0,0));
+        gl_Position = in_Matrix * (gl_in[i].gl_Position + RotationMatrix * vec4(size/10,shootLength[0],0,0));
     //    pass_oColor = pass_Color[0];
 
         // done with the vertex

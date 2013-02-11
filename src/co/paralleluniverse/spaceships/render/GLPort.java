@@ -281,8 +281,10 @@ public class GLPort implements GLEventListener {
         for (Object o : lastRes) {
             Spaceship s = (Spaceship) o;
             float duration = (ct - s.getLastMoved())  / TimeUnit.SECONDS.toMillis(1);
-            float duration2 = duration * duration;
+            float duration2 = duration * duration * Math.signum(duration); // is it correct?
             if (s.getLastMoved() > 0) {
+//                x = (float) (s.getX() + s.getVx() * duration);// + s.getAx() * duration2 );
+//                y = (float) (s.getY() + s.getVy() * duration);// + s.getAy() * duration2 );
                 x = (float) (s.getX() + s.getVx() * duration + s.getAx() * duration2 );
                 y = (float) (s.getY() + s.getVy() * duration + s.getAy() * duration2 );
                 col = Math.min(1.0f, 0.1f + (float) s.getNeighbors() / 10.0f);
@@ -290,9 +292,9 @@ public class GLPort implements GLEventListener {
                 verticesb.put(x);
                 verticesb.put(y);
 
-                colorsb.put(col);
+                colorsb.put((float)Math.max((ct - s.getTimeShot())/-3000.0+1,0));
                 colorsb.put(head);
-                colorsb.put(ct - s.getShootTime() < 100 ? 10f : 0f);
+                colorsb.put(ct - s.getShootTime() < 100 ? (float)s.getShootLength() : 0f);
             }
         }
 

@@ -10,6 +10,8 @@ import static co.paralleluniverse.spacebase.AABB.Y;
 import co.paralleluniverse.spacebase.ElementUpdater;
 import co.paralleluniverse.spacebase.MutableAABB;
 import co.paralleluniverse.spacebase.SpatialQueries;
+import co.paralleluniverse.spacebase.SpatialQuery;
+import co.paralleluniverse.spacebase.SpatialQuery.Result;
 import co.paralleluniverse.spacebase.SpatialSetVisitor;
 import co.paralleluniverse.spacebase.SpatialToken;
 import co.paralleluniverse.spacebase.SpatialVisitor;
@@ -124,6 +126,7 @@ public abstract class Spaceship {
                 };
             case 5:
                 return new Spaceship(global) {
+            public static final int MAX_SHOOT_RANGE = 400;
                     @Override
                     public String description() {
                         return "Read/update set query to process neighbors, and update with updater";
@@ -134,8 +137,66 @@ public abstract class Spaceship {
                         final Spaceship self = this;
 
                         final RandSpatial random = global.random;
-                        if (random.nextFloat()<0.01)
-                            self.shootTime = global.currentTime();
+                        
+                        if (global.currentTime()-self.getTimeShot()>3000 && random.nextFloat()<0.05) {
+                            double v = Math.sqrt(Math.pow(self.vx, 2)+Math.pow(self.vy, 2));
+                            double x2 = self.x + self.vx/v*MAX_SHOOT_RANGE;
+                            double y2 = self.y + self.vy/v*MAX_SHOOT_RANGE;
+                            double minX,maxX,minY,maxY;
+                            if (self.x<x2) {
+                                minX = self.x; maxX = x2;
+                            } else {
+                                minX = x2; maxX = self.x;
+                            }
+                            if (self.y<y2) {
+                                minY = self.y; maxY = y2;
+                            } else {
+                                minY = y2; maxY = self.y;
+                            }
+                            final AABB shootAABB = AABB.create(minX,maxX,minY,maxY);
+                            global.sb.queryForUpdate(SpatialQueries.NONE_QUERY,new SpatialQuery<Spaceship>() {
+
+                                @Override
+                                public Result queryContainer(AABB aabb) {
+                                    if (shootAABB.contains(aabb)) return Result.SOME;
+                                    if (shootAABB.intersects(aabb)) return Result.SOME;
+                                    return Result.NONE;
+                                }
+
+                                @Override
+                                public boolean queryElement(AABB aabb, Spaceship elem) {
+                                    if (!shootAABB.intersects(aabb)) return false;
+                                    double angleDiff = Math.abs(Math.atan2(elem.getX()-self.x,elem.getY()-self.y)-
+                                            Math.atan2(self.vx,self.vy));
+                                    if (angleDiff<0.05)
+                                        return true;
+                                    return false;
+                                }
+                            },new SpatialSetVisitor<Spaceship>() {
+
+                                @Override
+                                public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
+                                    ElementUpdater<Spaceship> closeShip = null;
+                                    double minRange2 = Math.pow(MAX_SHOOT_RANGE, 2);
+                                    for (ElementUpdater<Spaceship> eu : resultForUpdate) {
+                                        double rng2 = Math.pow(eu.elem().x-self.x,2) + 
+                                                Math.pow(eu.elem().y-self.y,2);
+                                        if (rng2>100 & rng2<=minRange2) { //not me and not so close
+                                            minRange2 = rng2;
+                                            closeShip = eu;
+                                        }
+                                        if (closeShip!=null) {
+                                            
+                                            self.shootTime = global.currentTime();
+                                            self.shootLength = Math.sqrt(minRange2);
+                                            eu.elem().setTimeShot(global.currentTime());
+                                        }
+                                    }
+                                }
+                            });
+                                    
+                                  
+                        }
 
                         
                         return global.sb.queryForUpdate(SpatialQueries.range(getAABB(), global.range), SpatialQueries.equals(getAABB()), new SpatialSetVisitor<Spaceship>() {
@@ -191,6 +252,20 @@ public abstract class Spaceship {
     private static final double MIN_PROXIMITY = 4;
     private long lastMoved = -1L;
     private long shootTime = 0;
+    private double shootLength = 10f;
+
+    public double getShootLength() {
+        return shootLength;
+    }
+    private long timeShot = 0;
+
+    public long getTimeShot() {
+        return timeShot;
+    }
+
+    public void setTimeShot(long timeShot) {
+        this.timeShot = timeShot;
+    }
 
     public long getShootTime() {
         return shootTime;
