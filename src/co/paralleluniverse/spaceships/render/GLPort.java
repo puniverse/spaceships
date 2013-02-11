@@ -11,7 +11,11 @@ import co.paralleluniverse.spacebase.ElementUpdater;
 import co.paralleluniverse.spacebase.MutableAABB;
 import co.paralleluniverse.spacebase.SpaceBase;
 import co.paralleluniverse.spacebase.SpatialQueries;
+import co.paralleluniverse.spacebase.SpatialQuery;
 import co.paralleluniverse.spacebase.SpatialSetVisitor;
+import co.paralleluniverse.spacebase.SpatialToken;
+import co.paralleluniverse.spacebase.SpatialVisitor;
+import co.paralleluniverse.spacebase.util.ConcurrentSet;
 import co.paralleluniverse.spaceships.Spaceship;
 import com.jogamp.newt.awt.NewtCanvasAWT;
 import com.jogamp.newt.opengl.GLWindow;
@@ -22,7 +26,11 @@ import com.jogamp.opengl.util.glsl.ShaderProgram;
 import java.awt.Component;
 import java.awt.Frame;
 import java.nio.FloatBuffer;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import javax.media.opengl.DebugGL3;
 import javax.media.opengl.GL2ES2;
@@ -45,6 +53,9 @@ import javax.media.opengl.fixedfunc.GLMatrixFunc;
  * @author pron
  */
 public class GLPort implements GLEventListener {
+    private long lastQuery = 0;
+    private Collection<Object> lastRes = null;
+
     public enum Toolkit {
         NEWT, NEWT_CANVAS, AWT
     };
@@ -99,7 +110,7 @@ public class GLPort implements GLEventListener {
         }
 
         drawable.addGLEventListener(this);
-        animator = new FPSAnimator(drawable, 30);
+        animator = new FPSAnimator(drawable, 60);
 
         if (TOOLKIT == Toolkit.NEWT) {
             final GLWindow window = (GLWindow) drawable;
@@ -198,7 +209,7 @@ public class GLPort implements GLEventListener {
         vao.bind(gl);
 
         this.vertices = new VBO(gl, 2, gl.GL_FLOAT, false, maxItems, gl.GL_DYNAMIC_DRAW);
-        this.colors = new VBO(gl, 2, gl.GL_FLOAT, false, maxItems, gl.GL_DYNAMIC_DRAW);
+        this.colors = new VBO(gl, 3, gl.GL_FLOAT, false, maxItems, gl.GL_DYNAMIC_DRAW);
 
         vao.setVertex(gl, "in_Position", vertices);
         vao.setVertex(gl, "in_Vertex", colors);
@@ -226,57 +237,82 @@ public class GLPort implements GLEventListener {
         vertices.destroy(gl);
     }
 
-    @Override
-    public void display(GLAutoDrawable drawable) {
+    public Collection<Object> query(SpatialQuery<? super Spaceship> query) {
         try {
-            final GL3 gl = drawable.getGL().getGL3();
-
-            shaderState.bind(gl);
-            vao.bind(gl);
-
-            vertices.clear();
-            colors.clear();
-            final FloatBuffer verticesb = (FloatBuffer) vertices.getBuffer();
-            final FloatBuffer colorsb = (FloatBuffer) colors.getBuffer();
-            //System.out.println("XXX " + verticeb + " " + port);
-            sb.query(SpatialQueries.contained(port), new SpatialSetVisitor<Spaceship>() {
+            final Collection<Object> resultSet =  sb.createCollection();
+//            final ConcurrentHashMap resultSet = new ConcurrentHashMap(100);
+            sb.query(query, new SpatialVisitor<Spaceship>() {
                 @Override
-                public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
-                    float x,y;
-                    final long ct = System.currentTimeMillis();
-                    for (Spaceship s : resultReadOnly) {
-                        long duration = ct - s.getLastMoved();
-                        if (s.getLastMoved() > 0 & duration > 0) {
-                            x = (float) (s.getX() + s.getVx() * duration / TimeUnit.SECONDS.toMillis(1));
-                            y = (float) (s.getY() + s.getVy() * duration / TimeUnit.SECONDS.toMillis(1));
-                            verticesb.put((float) s.getX());
-                            verticesb.put((float) s.getY());
+                public void visit(Spaceship elem, SpatialToken token) {
+                    resultSet.add(elem);
+                }
 
-                            colorsb.put(Math.min(1.0f, 0.1f + (float) s.getNeighbors() / 10.0f));
-                            colorsb.put((float) Math.atan2(s.getVx(), s.getVy()));
-                        }
-                    }
+                @Override
+                public void done() {
                 }
             }).join();
 
-            vertices.flip();
-            colors.flip();
-
-            int numElems = verticesb.limit() / 2;
-            vertices.write(gl, 0, numElems);
-            colors.write(gl, 0, numElems);
-
-            shaderState.setUniform(gl, "in_Matrix", 4, 4, pmv.glGetMvMatrixf());
-            //shaderState.getUBO("MatrixBlock").set(gl, "PMatrix", 4, 4, pmv.glGetMvMatrixf());
-
-            gl.glClear(gl.GL_COLOR_BUFFER_BIT);
-            gl.glDrawArrays(gl.GL_POINTS, 0, numElems);
-
-            vao.unbind(gl);
-            shaderState.unbind(gl);
+            return Collections.unmodifiableCollection(resultSet);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public void display(GLAutoDrawable drawable) {
+//        System.out.println("KKKK START");
+        final GL3 gl = drawable.getGL().getGL3();
+        shaderState.bind(gl);
+        vao.bind(gl);
+
+        vertices.clear();
+        colors.clear();
+        final FloatBuffer verticesb = (FloatBuffer) vertices.getBuffer();
+        final FloatBuffer colorsb = (FloatBuffer) colors.getBuffer();
+        float x, y, col, head;
+        final long ct = System.currentTimeMillis();
+        Iterator<Object> it;
+        boolean realQuery = false;
+        if (ct - lastQuery > 100) {
+            lastQuery = ct;
+            lastRes = query(SpatialQueries.contained(port));                
+            realQuery = true;
+        }
+        for (Object o : lastRes) {
+            Spaceship s = (Spaceship) o;
+            float duration = (ct - s.getLastMoved())  / TimeUnit.SECONDS.toMillis(1);
+            float duration2 = duration * duration;
+            if (s.getLastMoved() > 0) {
+                x = (float) (s.getX() + s.getVx() * duration + s.getAx() * duration2 );
+                y = (float) (s.getY() + s.getVy() * duration + s.getAy() * duration2 );
+                col = Math.min(1.0f, 0.1f + (float) s.getNeighbors() / 10.0f);
+                head = (float) Math.atan2(s.getVx(), s.getVy());
+                verticesb.put(x);
+                verticesb.put(y);
+
+                colorsb.put(col);
+                colorsb.put(head);
+                colorsb.put(ct - s.getShootTime() < 100 ? 10f : 0f);
+            }
+        }
+
+        vertices.flip();
+        colors.flip();
+
+        int numElems = verticesb.limit() / 2;
+//        System.out.println("KKKK SHIPS\t" + numElems + "\t" + sb.size() + "\t" + realQuery);
+        vertices.write(gl, 0, numElems);
+        colors.write(gl, 0, numElems);
+
+        shaderState.setUniform(gl, "in_Matrix", 4, 4, pmv.glGetMvMatrixf());
+        //shaderState.getUBO("MatrixBlock").set(gl, "PMatrix", 4, 4, pmv.glGetMvMatrixf());
+
+        gl.glClear(gl.GL_COLOR_BUFFER_BIT);
+        gl.glDrawArrays(gl.GL_POINTS, 0, numElems);
+
+        vao.unbind(gl);
+        shaderState.unbind(gl);
+//        System.out.println("KKKK END");
     }
 
     @Override

@@ -132,6 +132,12 @@ public abstract class Spaceship {
                     @Override
                     public Sync run(final Spaceships global) throws Exception {
                         final Spaceship self = this;
+
+                        final RandSpatial random = global.random;
+                        if (random.nextFloat()<0.01)
+                            self.shootTime = global.currentTime();
+
+                        
                         return global.sb.queryForUpdate(SpatialQueries.range(getAABB(), global.range), SpatialQueries.equals(getAABB()), new SpatialSetVisitor<Spaceship>() {
                             @Override
                             public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
@@ -184,6 +190,11 @@ public abstract class Spaceship {
     private static final double SPEED_BOUNCE_DAMPING = 0.9;
     private static final double MIN_PROXIMITY = 4;
     private long lastMoved = -1L;
+    private long shootTime = 0;
+
+    public long getShootTime() {
+        return shootTime;
+    }
     protected double x;
     protected double y;
     protected double vx;
@@ -192,6 +203,14 @@ public abstract class Spaceship {
     protected double ay;
     private volatile int neighbors;
     protected SpatialToken token;
+
+    public double getAx() {
+        return ax;
+    }
+
+    public double getAy() {
+        return ay;
+    }
 
     public double getVx() {
         return vx;
