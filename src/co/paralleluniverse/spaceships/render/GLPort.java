@@ -320,25 +320,18 @@ public class GLPort implements GLEventListener {
         final FloatBuffer colorsb = (FloatBuffer) colors.getBuffer();
         float col, head;
         long ct = System.currentTimeMillis();
-        Iterator<Object> it;
-        boolean realQuery = false;
+        double m = global.range *2;
 
         if (ct - lastQuery > 100) {
             lastQuery = ct;
-            lastRes = query(SpatialQueries.contained(port));                
-            realQuery = true;
+            lastRes = query(SpatialQueries.contained(AABB.create(port.min(X)-m,port.max(X)+m,port.min(Y)-m,port.max(Y)+m)));
         }
         if (!global.extrapolate)
             ct = lastQuery;
         double[] pos;
         for (Object o : lastRes) {
             Spaceship s = (Spaceship) o;
-//            float duration = (ct - s.getLastMoved())  / TimeUnit.SECONDS.toMillis(1);
             if (s.getLastMoved() > 0) {
-//                x = (float) (s.getX() + s.getVx() * duration);// + s.getAx() * duration2 );
-//                y = (float) (s.getY() + s.getVy() * duration);// + s.getAy() * duration2 );
-//                x = (float) (s.getX() + s.getVx() * duration + s.getAx() * duration2 );
-//                y = (float) (s.getY() + s.getVy() * duration + s.getAy() * duration2 );
                 pos = s.getCurrentPosition(ct);
                 col = Math.min(1.0f, 0.1f + (float) s.getNeighbors() / 10.0f);
                 verticesb.put((float)pos[0]);

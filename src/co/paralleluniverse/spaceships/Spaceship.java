@@ -258,21 +258,21 @@ public abstract class Spaceship {
     protected void processNeighbor(Spaceship s, long currentTime) {
         final double dx = s.x - x;
         final double dy = s.y - y;
-        final double d = mag(dx, dy);
+        double d = mag(dx, dy);
         final double udx = dx / d;
         final double udy = dy / d;
 
         double attraction = 0.0;
         double rejection = 0.0;
 
-        double mult = 6;
+        double mult = 10;
 
 //        mult *= Math.max(-19/2000 * (currentTime-s.timeShot) + 20,1);
-        if (d > MIN_PROXIMITY) {
+        if (d < MIN_PROXIMITY)
+            d = MIN_PROXIMITY;
 //            attraction = 0 / (d * d);
-            rejection = mult * REJECTION / (d * d);
-        }
-
+        rejection = Math.min(mult * REJECTION / (d * d),150);
+        
         ax += (attraction - rejection) * udx;
         ay += (attraction - rejection) * udy;
 
@@ -289,7 +289,7 @@ public abstract class Spaceship {
 
     public double[] getCurrentVelocity(long currentTime) {
         double duration = (double) (currentTime - lastMoved) / TimeUnit.SECONDS.toMillis(1);
-        double velocity[] = {vx + (ax) * duration, vy + (ax) * duration};
+        double velocity[] = {vx + (ax) * duration, vy + (ay) * duration};
         return velocity;
     }
 
