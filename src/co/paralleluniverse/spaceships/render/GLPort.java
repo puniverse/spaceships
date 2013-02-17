@@ -17,6 +17,7 @@ import co.paralleluniverse.spacebase.SpatialToken;
 import co.paralleluniverse.spacebase.SpatialVisitor;
 import co.paralleluniverse.spacebase.util.ConcurrentSet;
 import co.paralleluniverse.spaceships.Spaceship;
+import co.paralleluniverse.spaceships.Spaceships;
 import com.jogamp.newt.awt.NewtCanvasAWT;
 import com.jogamp.newt.opengl.GLWindow;
 import com.jogamp.opengl.util.FPSAnimator;
@@ -74,15 +75,17 @@ public class GLPort implements GLEventListener {
     private PMVMatrix pmv = new PMVMatrix();
     private float x = 1.0f;
     private final FPSAnimator animator;
+    private final Spaceships global;
 
     static {
         GLProfile.initSingleton();
     }
 
-    public GLPort(Toolkit toolkit, int maxItems, SpaceBase<Spaceship> sb, AABB bounds) {
+    public GLPort(Toolkit toolkit, int maxItems, Spaceships global, AABB bounds) {
         TOOLKIT = toolkit;
         this.maxItems = maxItems;
-        this.sb = sb;
+        this.global = global;
+        this.sb = global.sb;
         this.bounds = bounds;
 
         final GLProfile glp = GLProfile.get(GLProfile.GL3);
@@ -269,8 +272,8 @@ public class GLPort implements GLEventListener {
         colors.clear();
         final FloatBuffer verticesb = (FloatBuffer) vertices.getBuffer();
         final FloatBuffer colorsb = (FloatBuffer) colors.getBuffer();
-        float x, y, col, head;
-        final long ct = System.currentTimeMillis();
+        float col, head;
+        long ct = System.currentTimeMillis();
         Iterator<Object> it;
         boolean realQuery = false;
         if (ct - lastQuery > 100) {
@@ -278,22 +281,24 @@ public class GLPort implements GLEventListener {
             lastRes = query(SpatialQueries.contained(port));                
             realQuery = true;
         }
+        if (!global.extrapolate)
+            ct = lastQuery;
+        double[] pos;
         for (Object o : lastRes) {
             Spaceship s = (Spaceship) o;
-            float duration = (ct - s.getLastMoved())  / TimeUnit.SECONDS.toMillis(1);
-            float duration2 = duration * duration * Math.signum(duration); // is it correct?
+//            float duration = (ct - s.getLastMoved())  / TimeUnit.SECONDS.toMillis(1);
             if (s.getLastMoved() > 0) {
 //                x = (float) (s.getX() + s.getVx() * duration);// + s.getAx() * duration2 );
 //                y = (float) (s.getY() + s.getVy() * duration);// + s.getAy() * duration2 );
-                x = (float) (s.getX() + s.getVx() * duration + s.getAx() * duration2 );
-                y = (float) (s.getY() + s.getVy() * duration + s.getAy() * duration2 );
+//                x = (float) (s.getX() + s.getVx() * duration + s.getAx() * duration2 );
+//                y = (float) (s.getY() + s.getVy() * duration + s.getAy() * duration2 );
+                pos = s.getCurrentPosition(ct);
                 col = Math.min(1.0f, 0.1f + (float) s.getNeighbors() / 10.0f);
-                head = (float) Math.atan2(s.getVx(), s.getVy());
-                verticesb.put(x);
-                verticesb.put(y);
+                verticesb.put((float)pos[0]);
+                verticesb.put((float)pos[1]);
 
                 colorsb.put((float)Math.max((ct - s.getTimeShot())/-3000.0+1,0));
-                colorsb.put(head);
+                colorsb.put((float) s.getCurrentHeading(ct));
                 colorsb.put(ct - s.getShootTime() < 100 ? (float)s.getShootLength() : 0f);
             }
         }

@@ -81,6 +81,7 @@ public class Spaceships {
     public final RandSpatial random;
     private final Spaceship[] ships;
     public final SpaceBase<Spaceship> sb;
+    public final boolean extrapolate;
 
     public Spaceships(Properties props) throws Exception {
         this.dim = 2;
@@ -92,6 +93,7 @@ public class Spaceships {
         this.N = Integer.parseInt(props.getProperty("N", "10000"));
         this.speedVariance = Double.parseDouble(props.getProperty("speed-variance", "1"));
         this.range = Double.parseDouble(props.getProperty("radar-range", "10"));
+        this.extrapolate = Boolean.parseBoolean(props.getProperty("extrapolate", "true"));
 
         if (props.getProperty("dir") != null) {
             this.metricsDir = new File(System.getProperty("user.home") + "/" + props.getProperty("dir"));
@@ -208,7 +210,7 @@ public class Spaceships {
 //        out.println("Sleeping for 5 seconds....");
 //        Thread.sleep(5000);
 
-        GLPort port = new GLPort(toolkit, N, sb, bounds);
+        GLPort port = new GLPort(toolkit, N, Spaceships.this, bounds);
         if (timeStream != null)
             timeStream.println("# time, millis, millis1, millis0");
 
@@ -218,13 +220,6 @@ public class Spaceships {
             float millis0, millis1, millis;
 
             if (mode == 1) {
-                sb.join(SpatialQueries.distance(range), new SpatialJoinVisitor<Spaceship, Spaceship>() {
-                    @Override
-                    public void visit(Spaceship elem1, SpatialToken token1, Spaceship elem2, SpatialToken token2) {
-                        elem1.incNeighbors();
-                        elem2.incNeighbors();
-                    }
-                }).join();
             } else {
                 for (int i = 0; i < N; i++) {
                     final Spaceship s = ships[i];

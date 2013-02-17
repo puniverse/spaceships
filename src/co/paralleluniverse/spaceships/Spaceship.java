@@ -9,6 +9,7 @@ import static co.paralleluniverse.spacebase.AABB.X;
 import static co.paralleluniverse.spacebase.AABB.Y;
 import co.paralleluniverse.spacebase.ElementUpdater;
 import co.paralleluniverse.spacebase.MutableAABB;
+import co.paralleluniverse.spacebase.SpatialModifyingVisitor;
 import co.paralleluniverse.spacebase.SpatialQueries;
 import co.paralleluniverse.spacebase.SpatialQuery;
 import co.paralleluniverse.spacebase.SpatialQuery.Result;
@@ -28,6 +29,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @author pron
  */
 public abstract class Spaceship {
+    public static final int MAX_SHOOT_RANGE = 400;
+
     public static Spaceship create(Spaceships global) {
         return create(global, global.mode);
     }
@@ -38,67 +41,6 @@ public abstract class Spaceship {
 
     private static Spaceship create(Spaceships global, int mode) {
         switch (mode) {
-            case 1:
-                return new Spaceship(global) {
-                    @Override
-                    public String description() {
-                        return "Join to count neighbors, and then a global update.";
-                    }
-
-                    @Override
-                    public Sync run(final Spaceships global) throws Exception {
-                        resetNeighborCounter();
-                        return null;
-                    }
-                };
-            case 2:
-                return new Spaceship(global) {
-                    @Override
-                    public String description() {
-                        return "Read set query to process neighbors, and then a global update.";
-                    }
-
-                    @Override
-                    public Sync run(final Spaceships global) throws Exception {
-                        return global.sb.query(SpatialQueries.range(getAABB(), global.range), new SpatialSetVisitor<Spaceship>() {
-                            @Override
-                            public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
-                                process(resultReadOnly);
-                            }
-                        });
-                    }
-                };
-            case 3:
-                return new Spaceship(global) {
-                    @Override
-                    public String description() {
-                        return "Read (non-set) query to process neighbors, and an update in done()";
-                    }
-
-                    @Override
-                    public Sync run(final Spaceships global) throws Exception {
-                        ax = 0.0;
-                        ay = 0.0;
-                        return global.sb.query(SpatialQueries.range(getAABB(), global.range), new SpatialVisitor<Spaceship>() {
-                            @Override
-                            public void visit(Spaceship elem, SpatialToken token) {
-                                process(elem);
-                            }
-
-                            @Override
-                            public void done() {
-                                global.sb.update(token, new UpdateVisitor<Spaceship>() {
-                                    @Override
-                                    public AABB visit(Spaceship elem) {
-                                        resetNeighborCounter();
-                                        move(global, global.currentTime());
-                                        return getAABB();
-                                    }
-                                });
-                            }
-                        });
-                    }
-                };
             case 4:
                 return new Spaceship(global) {
                     @Override
@@ -111,7 +53,7 @@ public abstract class Spaceship {
                         return global.sb.query(SpatialQueries.range(getAABB(), global.range), new SpatialSetVisitor<Spaceship>() {
                             @Override
                             public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
-                                process(resultReadOnly);
+                                process(resultReadOnly, global.currentTime());
 
                                 global.sb.update(token, new UpdateVisitor<Spaceship>() {
                                     @Override
@@ -126,7 +68,6 @@ public abstract class Spaceship {
                 };
             case 5:
                 return new Spaceship(global) {
-            public static final int MAX_SHOOT_RANGE = 400;
                     @Override
                     public String description() {
                         return "Read/update set query to process neighbors, and update with updater";
@@ -137,72 +78,14 @@ public abstract class Spaceship {
                         final Spaceship self = this;
 
                         final RandSpatial random = global.random;
-                        
-                        if (global.currentTime()-self.getTimeShot()>3000 && random.nextFloat()<0.05) {
-                            double v = Math.sqrt(Math.pow(self.vx, 2)+Math.pow(self.vy, 2));
-                            double x2 = self.x + self.vx/v*MAX_SHOOT_RANGE;
-                            double y2 = self.y + self.vy/v*MAX_SHOOT_RANGE;
-                            double minX,maxX,minY,maxY;
-                            if (self.x<x2) {
-                                minX = self.x; maxX = x2;
-                            } else {
-                                minX = x2; maxX = self.x;
-                            }
-                            if (self.y<y2) {
-                                minY = self.y; maxY = y2;
-                            } else {
-                                minY = y2; maxY = self.y;
-                            }
-                            final AABB shootAABB = AABB.create(minX,maxX,minY,maxY);
-                            global.sb.queryForUpdate(SpatialQueries.NONE_QUERY,new SpatialQuery<Spaceship>() {
 
-                                @Override
-                                public Result queryContainer(AABB aabb) {
-                                    if (shootAABB.contains(aabb)) return Result.SOME;
-                                    if (shootAABB.intersects(aabb)) return Result.SOME;
-                                    return Result.NONE;
-                                }
+                        if (global.currentTime() - self.getTimeShot() > 3000 && random.nextFloat() < 0.2)
+                            tryToShoot(self, global);
 
-                                @Override
-                                public boolean queryElement(AABB aabb, Spaceship elem) {
-                                    if (!shootAABB.intersects(aabb)) return false;
-                                    double angleDiff = Math.abs(Math.atan2(elem.getX()-self.x,elem.getY()-self.y)-
-                                            Math.atan2(self.vx,self.vy));
-                                    if (angleDiff<0.05)
-                                        return true;
-                                    return false;
-                                }
-                            },new SpatialSetVisitor<Spaceship>() {
-
-                                @Override
-                                public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
-                                    ElementUpdater<Spaceship> closeShip = null;
-                                    double minRange2 = Math.pow(MAX_SHOOT_RANGE, 2);
-                                    for (ElementUpdater<Spaceship> eu : resultForUpdate) {
-                                        double rng2 = Math.pow(eu.elem().x-self.x,2) + 
-                                                Math.pow(eu.elem().y-self.y,2);
-                                        if (rng2>100 & rng2<=minRange2) { //not me and not so close
-                                            minRange2 = rng2;
-                                            closeShip = eu;
-                                        }
-                                        if (closeShip!=null) {
-                                            
-                                            self.shootTime = global.currentTime();
-                                            self.shootLength = Math.sqrt(minRange2);
-                                            eu.elem().setTimeShot(global.currentTime());
-                                        }
-                                    }
-                                }
-                            });
-                                    
-                                  
-                        }
-
-                        
                         return global.sb.queryForUpdate(SpatialQueries.range(getAABB(), global.range), SpatialQueries.equals(getAABB()), new SpatialSetVisitor<Spaceship>() {
                             @Override
                             public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
-                                process(resultReadOnly);
+                                process(resultReadOnly, global.currentTime());
 
                                 assert resultForUpdate.size() <= 1;
                                 for (final ElementUpdater<Spaceship> updater : resultForUpdate) {
@@ -215,39 +98,13 @@ public abstract class Spaceship {
                         });
                     }
                 };
-            case 6:
-                return new Spaceship(global) {
-                    @Override
-                    public String description() {
-                        return "Read/update set query to process neighbors, and update in visit";
-                    }
-
-                    @Override
-                    public Sync run(final Spaceships global) throws Exception {
-                        return global.sb.queryForUpdate(SpatialQueries.range(getAABB(), global.range), SpatialQueries.equals(global.sb.getElement(token)), new SpatialSetVisitor<Spaceship>() {
-                            @Override
-                            public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
-                                process(resultReadOnly);
-
-                                global.sb.update(token, new UpdateVisitor<Spaceship>() {
-                                    @Override
-                                    public AABB visit(Spaceship elem) {
-                                        resetNeighborCounter();
-                                        move(global, global.currentTime());
-                                        return getAABB();
-                                    }
-                                });
-                            }
-                        });
-                    }
-                };
             default:
                 return null;
         }
     }
     private static final double ATTRACTION = 2000.0;
     private static final double REJECTION = 8000.0;
-    private static final double SPEED_LIMIT = 50.0;
+    private static final double SPEED_LIMIT = 200.0;
     private static final double SPEED_BOUNCE_DAMPING = 0.9;
     private static final double MIN_PROXIMITY = 4;
     private long lastMoved = -1L;
@@ -263,8 +120,38 @@ public abstract class Spaceship {
         return timeShot;
     }
 
-    public void setTimeShot(long timeShot) {
-        this.timeShot = timeShot;
+    public void shot(final Spaceships global, Spaceship shooter) {
+        this.timeShot = global.currentTime();
+        final double dx = shooter.x - x;
+        final double dy = shooter.y - y;
+        final double d = mag(dx, dy);
+        if (d < MIN_PROXIMITY)
+            return;
+        final double udx = dx / d;
+        final double udy = dy / d;
+
+        double hitRecoil = -100;
+
+        reduceExAcc(timeShot);
+        exVx += hitRecoil * udx;
+        exVy += hitRecoil * udy;
+        this.exAccUpdated = timeShot;
+//        shooter.x;
+//        this.eAx = 0;
+//        this.vy = 0;
+        Sync queryForUpdate = global.sb.queryForUpdate(SpatialQueries.range(getAABB(), global.range*2),
+                new SpatialModifyingVisitor<Spaceship>() {
+
+            @Override
+            public void visit(ElementUpdater<Spaceship> updater) {
+                updater.elem().blast(global,Spaceship.this);
+            }
+
+            @Override
+            public void done() {}
+        });
+
+
     }
 
     public long getShootTime() {
@@ -276,26 +163,15 @@ public abstract class Spaceship {
     protected double vy;
     protected double ax;
     protected double ay;
+    protected long exAccUpdated = 0;
+    protected double exVx = 0;
+    protected double exVy = 0;
+    protected double exAx = 0;
+    protected double exAy = 0;
     private volatile int neighbors;
     protected SpatialToken token;
 
-    public double getAx() {
-        return ax;
-    }
-
-    public double getAy() {
-        return ay;
-    }
-
-    public double getVx() {
-        return vx;
-    }
-
-    public double getVy() {
-        return vy;
-    }
-    private final AtomicInteger neighborCounter = new AtomicInteger();
-
+//    private final AtomicInteger neighborCounter = new AtomicInteger();
     public Spaceship(Spaceships global) {
         if (global == null)
             return;
@@ -306,7 +182,7 @@ public abstract class Spaceship {
         y = random.randRange(global.bounds.min(Y), global.bounds.max(Y));
 
         final double direction = random.nextDouble() * 2 * Math.PI;
-        final double speed = random.nextGaussian() * global.speedVariance;
+        final double speed = SPEED_LIMIT / 4 + random.nextGaussian() * global.speedVariance;
         setVelocityDir(direction, speed);
     }
 
@@ -314,7 +190,7 @@ public abstract class Spaceship {
 
     public abstract String description();
 
-    protected void process(Set<Spaceship> neighbors) {
+    protected void process(Set<Spaceship> neighbors, long currentTime) {
         final int n = neighbors.size();
         this.neighbors = n;
 
@@ -325,19 +201,46 @@ public abstract class Spaceship {
             for (Spaceship s : neighbors) {
                 if (s == this)
                     continue;
-                processNeighbor(s);
+                processNeighbor(s, currentTime);
             }
         }
     }
 
-    protected void process(Spaceship s) {
+    protected void process(Spaceship s, long currentTime) {
         if (s == this)
             return;
-        incNeighbors();
-        processNeighbor(s);
+        processNeighbor(s, currentTime);
     }
 
-    protected void processNeighbor(Spaceship s) {
+    protected void tryToShoot(final Spaceship self, final Spaceships global) {
+        double v = Math.sqrt(Math.pow(self.vx, 2) + Math.pow(self.vy, 2));
+        double x2 = self.x + self.vx / v * MAX_SHOOT_RANGE;
+        double y2 = self.y + self.vy / v * MAX_SHOOT_RANGE;
+
+        global.sb.queryForUpdate(SpatialQueries.NONE_QUERY, new LineQuery<Spaceship>(x + 1, x2, y + 1, y2), new SpatialSetVisitor<Spaceship>() {
+            @Override
+            public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
+                ElementUpdater<Spaceship> closeShip = null;
+                double minRange2 = Math.pow(MAX_SHOOT_RANGE, 2);
+                for (ElementUpdater<Spaceship> eu : resultForUpdate) {
+                    double rng2 = Math.pow(eu.elem().x - self.x, 2)
+                            + Math.pow(eu.elem().y - self.y, 2);
+                    if (rng2 > 100 & rng2 <= minRange2) { //not me and not so close
+                        minRange2 = rng2;
+                        closeShip = eu;
+                    }
+                    if (closeShip != null) {
+
+                        self.shootTime = global.currentTime();
+                        self.shootLength = Math.sqrt(minRange2);
+                        eu.elem().shot(global, self);
+                    }
+                }
+            }
+        });
+    }
+
+    protected void processNeighbor(Spaceship s, long currentTime) {
         final double dx = s.x - x;
         final double dy = s.y - y;
         final double d = mag(dx, dy);
@@ -347,31 +250,63 @@ public abstract class Spaceship {
         double attraction = 0.0;
         double rejection = 0.0;
 
+        double mult = 2;
+
+//        mult *= Math.max(-19/2000 * (currentTime-s.timeShot) + 20,1);
         if (d > MIN_PROXIMITY) {
-            attraction = ATTRACTION / (d * d);
-            rejection = REJECTION / (d * d * d);
+//            attraction = 0 / (d * d);
+            rejection = mult * REJECTION / (d * d);
         }
 
         ax += (attraction - rejection) * udx;
         ay += (attraction - rejection) * udy;
-        
+
         assert !Double.isNaN(ax + ay);
+    }
+
+    public double[] getCurrentPosition(long currentTime) {
+        double duration = (double) (currentTime - lastMoved) / TimeUnit.SECONDS.toMillis(1);
+        double duration2 = duration * duration;// * Math.signum(duration);
+        double pos[] = {x + (vx + exVx) * duration + (exAx + ax) * duration2, y + (vy + exVy) * duration + (exAy + ay) * duration2};
+        return pos;
+    }
+
+    public double[] getCurrentVelocity(long currentTime) {
+        double duration = (double) (currentTime - lastMoved) / TimeUnit.SECONDS.toMillis(1);
+        double velocity[] = {vx + (ax) * duration, vy + (ax) * duration};
+        return velocity;
+    }
+
+    public double getCurrentHeading(long currentTime) {
+        double velocity[] = getCurrentVelocity(currentTime);
+        return Math.atan2(velocity[0], velocity[1]);
+    }
+
+    public void reduceExAcc(long currentTime) {
+        double duration = (double) (currentTime - exAccUpdated) / TimeUnit.SECONDS.toMillis(1);;
+        if (exAccUpdated > 0 & duration > 0) {
+            exVx /= (1 + 8 * duration);
+            exVy /= (1 + 8 * duration);
+        }
+        exAccUpdated = currentTime;
+
     }
 
     public void move(Spaceships global, long currentTime) {
         final long duration = currentTime - lastMoved;
         if (lastMoved > 0 & duration > 0) {
             final AABB bounds = global.bounds;
-
-            vx += ax * duration / TimeUnit.SECONDS.toMillis(1);
-            vy += ay * duration / TimeUnit.SECONDS.toMillis(1);
+            double pos[] = getCurrentPosition(currentTime);
+            x = pos[0];
+            y = pos[1];
+            double vel[] = getCurrentVelocity(currentTime);
+            vx = vel[0];
+            vy = vel[1];
 
             limitSpeed();
 
             assert !Double.isNaN(vx + vy);
-            
-            x += vx * duration / TimeUnit.SECONDS.toMillis(1);
-            y += vy * duration / TimeUnit.SECONDS.toMillis(1);
+
             if (x > bounds.max(X) || x < bounds.min(X)) {
                 x = Math.min(x, bounds.max(X));
                 x = Math.max(x, bounds.min(X));
@@ -382,10 +317,11 @@ public abstract class Spaceship {
                 y = Math.max(y, bounds.min(Y));
                 vy = -vy * SPEED_BOUNCE_DAMPING;
             }
-            
+
             assert !Double.isNaN(x + y);
         }
         this.lastMoved = currentTime;
+        reduceExAcc(currentTime);
     }
 
     public long getLastMoved() {
@@ -450,12 +386,20 @@ public abstract class Spaceship {
         this.token = token;
     }
 
-    void incNeighbors() {
-        neighborCounter.incrementAndGet();
-    }
+    private void blast(Spaceships global, Spaceship hitted) {        
+        final double dx = hitted.x - x;
+        final double dy = hitted.y - y;
+        final double d = mag(dx, dy);
+        if (d < MIN_PROXIMITY)
+            return;
+        final double udx = dx / d;
+        final double udy = dy / d;
 
-    void resetNeighborCounter() {
-        neighbors = neighborCounter.get();
-        neighborCounter.set(0);
+        double hitRecoil = Math.max(-20000/d,-100);
+
+        reduceExAcc(global.currentTime());
+        exVx = hitRecoil * udx;
+        exVy = hitRecoil * udy;
+        this.exAccUpdated = global.currentTime();
     }
 }
