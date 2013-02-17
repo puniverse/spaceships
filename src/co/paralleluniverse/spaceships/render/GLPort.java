@@ -24,8 +24,14 @@ import com.jogamp.opengl.util.FPSAnimator;
 import com.jogamp.opengl.util.PMVMatrix;
 import com.jogamp.opengl.util.glsl.ShaderCode;
 import com.jogamp.opengl.util.glsl.ShaderProgram;
+import com.jogamp.opengl.util.texture.Texture;
+import com.jogamp.opengl.util.texture.TextureData;
+import com.jogamp.opengl.util.texture.TextureIO;
 import java.awt.Component;
 import java.awt.Frame;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.FloatBuffer;
 import java.util.Collection;
 import java.util.Collections;
@@ -34,6 +40,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import javax.media.opengl.DebugGL3;
+import javax.media.opengl.GL;
 import javax.media.opengl.GL2ES2;
 import javax.media.opengl.GL3;
 import javax.media.opengl.GLAutoDrawable;
@@ -56,6 +63,7 @@ import javax.media.opengl.fixedfunc.GLMatrixFunc;
 public class GLPort implements GLEventListener {
     private long lastQuery = 0;
     private Collection<Object> lastRes = null;
+    private Texture myTexture;
 
     public enum Toolkit {
         NEWT, NEWT_CANVAS, AWT
@@ -174,14 +182,26 @@ public class GLPort implements GLEventListener {
         //drawable.setGL(new TraceGL3(new DebugGL3(drawable.getGL().getGL3()), System.err));
 
         final GL3 gl = drawable.getGL().getGL3();
+        try {
+            InputStream stream = new FileInputStream("spaceship.png");
+            TextureData data = TextureIO.newTextureData(GLProfile.get(GLProfile.GL3),stream, false, "png");
+            myTexture = TextureIO.newTexture(data);
+        }
+        catch (IOException exc) {
+            exc.printStackTrace();
+            System.exit(1);
+        }
+
 
         port.min(X, -drawable.getWidth() / 2);
         port.max(X, drawable.getWidth() / 2);
         port.min(Y, -drawable.getHeight() / 2);
         port.max(Y, drawable.getHeight() / 2);
-        gl.glEnable(gl.GL_VERTEX_PROGRAM_POINT_SIZE);
+        //gl.glEnable(gl.GL_VERTEX_PROGRAM_POINT_SIZE);
         gl.glViewport(0, 0, (int) (port.max(X) - port.min(X)), (int) (port.max(Y) - port.min(Y)));
         gl.glClearColor(0, 0, 0, 1);
+        gl.glEnable(GL.GL_BLEND);
+        gl.glBlendFunc(GL.GL_ONE, GL.GL_ONE_MINUS_SRC_ALPHA);
 
         ShaderCode vertexShader = ShaderCode.create(gl, gl.GL_VERTEX_SHADER, this.getClass(), "shader", null, "vertex", false);
         ShaderCode geometryShader = ShaderCode.create(gl, gl.GL_GEOMETRY_SHADER, this.getClass(), "shader", null, "geometry", false);
@@ -217,7 +237,7 @@ public class GLPort implements GLEventListener {
         vao.setVertex(gl, "in_Position", vertices);
         vao.setVertex(gl, "in_Vertex", colors);
 
-        shaderState.setUniform(gl, "in_Matrix", 4, 4, pmv.glGetMvMatrixf());
+//        shaderState.setUniform(gl, "myTexture", myTexture);
         //shaderState.createUBO(gl, "MatrixBlock");
         //shaderState.getUBO("MatrixBlock").bind(gl).set(gl, "PMatrix", 4, 4, pmv.glGetMvMatrixf());
 
@@ -267,6 +287,7 @@ public class GLPort implements GLEventListener {
         final GL3 gl = drawable.getGL().getGL3();
         shaderState.bind(gl);
         vao.bind(gl);
+        myTexture.bind(gl);
 
         vertices.clear();
         colors.clear();
@@ -312,6 +333,7 @@ public class GLPort implements GLEventListener {
         colors.write(gl, 0, numElems);
 
         shaderState.setUniform(gl, "in_Matrix", 4, 4, pmv.glGetMvMatrixf());
+//        shaderState.setUniform(gl, "myTexture",myTexture.getTextureObject(gl));
         //shaderState.getUBO("MatrixBlock").set(gl, "PMatrix", 4, 4, pmv.glGetMvMatrixf());
 
         gl.glClear(gl.GL_COLOR_BUFFER_BIT);

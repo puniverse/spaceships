@@ -104,7 +104,7 @@ public abstract class Spaceship {
     }
     private static final double ATTRACTION = 2000.0;
     private static final double REJECTION = 8000.0;
-    private static final double SPEED_LIMIT = 200.0;
+    private static final double SPEED_LIMIT = 100.0;
     private static final double SPEED_BOUNCE_DAMPING = 0.9;
     private static final double MIN_PROXIMITY = 4;
     private long lastMoved = -1L;
