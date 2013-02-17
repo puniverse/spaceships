@@ -63,7 +63,9 @@ import javax.media.opengl.fixedfunc.GLMatrixFunc;
 public class GLPort implements GLEventListener {
     private long lastQuery = 0;
     private Collection<Object> lastRes = null;
-    private Texture myTexture;
+    private Texture spaceshipTex;
+    private Texture explosionTex;
+    private ShaderProgram shaderProgram;
 
     public enum Toolkit {
         NEWT, NEWT_CANVAS, AWT
@@ -185,7 +187,16 @@ public class GLPort implements GLEventListener {
         try {
             InputStream stream = new FileInputStream("spaceship.png");
             TextureData data = TextureIO.newTextureData(GLProfile.get(GLProfile.GL3),stream, false, "png");
-            myTexture = TextureIO.newTexture(data);
+            spaceshipTex = TextureIO.newTexture(data);
+        }
+        catch (IOException exc) {
+            exc.printStackTrace();
+            System.exit(1);
+        }
+        try {
+            InputStream stream = new FileInputStream("explosion.png");
+            TextureData data = TextureIO.newTextureData(GLProfile.get(GLProfile.GL3),stream, false, "png");
+            explosionTex = TextureIO.newTexture(data);
         }
         catch (IOException exc) {
             exc.printStackTrace();
@@ -214,7 +225,7 @@ public class GLPort implements GLEventListener {
         if (!fragmentShader.compile(gl, System.err))
             throw new GLException("Couldn't compile shader: " + fragmentShader);
 
-        final ShaderProgram shaderProgram = new ShaderProgram();
+        shaderProgram = new ShaderProgram();
         shaderProgram.add(gl, vertexShader, System.err);
         shaderProgram.add(gl, geometryShader, System.err);
         shaderProgram.add(gl, fragmentShader, System.err);
@@ -287,7 +298,21 @@ public class GLPort implements GLEventListener {
         final GL3 gl = drawable.getGL().getGL3();
         shaderState.bind(gl);
         vao.bind(gl);
-        myTexture.bind(gl);
+        int spaceshipLoc = gl.glGetUniformLocation(shaderProgram.program(), "spaceshipTex");
+        gl.glUniform1i(spaceshipLoc, 0);
+        gl.glActiveTexture(GL.GL_TEXTURE0);
+        gl.glBindTexture(GL.GL_TEXTURE_2D, spaceshipTex.getTextureObject(gl));
+
+        int explosionLoc = gl.glGetUniformLocation(shaderProgram.program(), "explosionTex");
+        gl.glUniform1i(explosionLoc, 1);
+        gl.glActiveTexture(GL.GL_TEXTURE0 + 1);
+        gl.glBindTexture(GL.GL_TEXTURE_2D, explosionTex.getTextureObject(gl));
+//        spaceshipTex.enable(gl);
+//        spaceshipTex.bind(gl);
+//        gl.glActiveTexture(GL.GL_TEXTURE1);
+//        explosionTex.enable(gl);
+//        explosionTex.bind(gl);
+//        shaderState.setUniform(gl, "myTexture", spaceshipTex.getTextureObject(gl));
 
         vertices.clear();
         colors.clear();
@@ -297,6 +322,7 @@ public class GLPort implements GLEventListener {
         long ct = System.currentTimeMillis();
         Iterator<Object> it;
         boolean realQuery = false;
+
         if (ct - lastQuery > 100) {
             lastQuery = ct;
             lastRes = query(SpatialQueries.contained(port));                
@@ -317,8 +343,10 @@ public class GLPort implements GLEventListener {
                 col = Math.min(1.0f, 0.1f + (float) s.getNeighbors() / 10.0f);
                 verticesb.put((float)pos[0]);
                 verticesb.put((float)pos[1]);
-
-                colorsb.put((float)Math.max((ct - s.getTimeShot())/-3000.0+1,0));
+                if (s.getBlowTime()>0) {
+                    colorsb.put(Math.min(1.0f, (ct-s.getBlowTime())/500f));                                        
+                } else                     
+                    colorsb.put(0);
                 colorsb.put((float) s.getCurrentHeading(ct));
                 colorsb.put(ct - s.getShootTime() < 100 ? (float)s.getShootLength() : 0f);
             }

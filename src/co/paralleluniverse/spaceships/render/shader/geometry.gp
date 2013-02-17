@@ -2,17 +2,18 @@
  
 layout(points) in;
 layout (triangle_strip, max_vertices=8) out;
-in vec4 pass_Color[1];
+in float pass_Color[1];
 in float heading[1];
 in float shootLength[1];
 uniform mat4 in_Matrix;
-
+out float tex;
 out vec2 vTexCoord;
 
 
   
  void main()
 {
+  tex = pass_Color[0];
   float size = 16;  
   mat4 RotationMatrix = mat4( cos( heading[0] ), -sin( heading[0] ), 0.0, 0.0,
 			    sin( heading[0] ),  cos( heading[0] ), 0.0, 0.0,

@@ -30,6 +30,11 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public abstract class Spaceship {
     public static final int MAX_SHOOT_RANGE = 400;
+    public static final int TIMES_HITTED_TO_BLOW = 4;
+
+    public long getBlowTime() {
+        return blowTime;
+    }
 
     public static Spaceship create(Spaceships global) {
         return create(global, global.mode);
@@ -78,6 +83,9 @@ public abstract class Spaceship {
                         final Spaceship self = this;
 
                         final RandSpatial random = global.random;
+                        if (self.blowTime>0 & global.currentTime() - self.blowTime > 500)
+                            return global.sb.delete(self.getToken());
+                        if (self.blowTime>0) return null;
 
                         if (global.currentTime() - self.getTimeShot() > 3000 && random.nextFloat() < 0.2)
                             tryToShoot(self, global);
@@ -110,6 +118,8 @@ public abstract class Spaceship {
     private long lastMoved = -1L;
     private long shootTime = 0;
     private double shootLength = 10f;
+    private int timesHitted = 0;
+    private long blowTime = 0;
 
     public double getShootLength() {
         return shootLength;
@@ -121,35 +131,38 @@ public abstract class Spaceship {
     }
 
     public void shot(final Spaceships global, Spaceship shooter) {
+        this.timesHitted++;
         this.timeShot = global.currentTime();
-        final double dx = shooter.x - x;
-        final double dy = shooter.y - y;
-        final double d = mag(dx, dy);
-        if (d < MIN_PROXIMITY)
-            return;
-        final double udx = dx / d;
-        final double udy = dy / d;
+        if (timesHitted< TIMES_HITTED_TO_BLOW) {
+            final double dx = shooter.x - x;
+            final double dy = shooter.y - y;
+            final double d = mag(dx, dy);
+            if (d < MIN_PROXIMITY)
+                return;
+            final double udx = dx / d;
+            final double udy = dy / d;
 
-        double hitRecoil = -100;
+            double hitRecoil = -100;
 
-        reduceExAcc(timeShot);
-        exVx += hitRecoil * udx;
-        exVy += hitRecoil * udy;
-        this.exAccUpdated = timeShot;
-//        shooter.x;
-//        this.eAx = 0;
-//        this.vy = 0;
-        Sync queryForUpdate = global.sb.queryForUpdate(SpatialQueries.range(getAABB(), global.range*2),
-                new SpatialModifyingVisitor<Spaceship>() {
+            reduceExAcc(timeShot);
+            exVx += hitRecoil * udx;
+            exVy += hitRecoil * udy;
+            this.exAccUpdated = timeShot;
+            
+        } else if (blowTime==0) {
+            Sync queryForUpdate = global.sb.queryForUpdate(SpatialQueries.range(getAABB(), global.range*2),
+                    new SpatialModifyingVisitor<Spaceship>() {
 
-            @Override
-            public void visit(ElementUpdater<Spaceship> updater) {
-                updater.elem().blast(global,Spaceship.this);
-            }
+                @Override
+                public void visit(ElementUpdater<Spaceship> updater) {
+                    updater.elem().blast(global,Spaceship.this);
+                }
 
-            @Override
-            public void done() {}
-        });
+                @Override
+                public void done() {}
+            });
+            blowTime = global.currentTime();
+        }
 
 
     }
@@ -250,7 +263,7 @@ public abstract class Spaceship {
         double attraction = 0.0;
         double rejection = 0.0;
 
-        double mult = 2;
+        double mult = 6;
 
 //        mult *= Math.max(-19/2000 * (currentTime-s.timeShot) + 20,1);
         if (d > MIN_PROXIMITY) {
@@ -265,6 +278,7 @@ public abstract class Spaceship {
     }
 
     public double[] getCurrentPosition(long currentTime) {
+        if (blowTime>0) currentTime=blowTime;
         double duration = (double) (currentTime - lastMoved) / TimeUnit.SECONDS.toMillis(1);
         double duration2 = duration * duration;// * Math.signum(duration);
         double pos[] = {x + (vx + exVx) * duration + (exAx + ax) * duration2, y + (vy + exVy) * duration + (exAy + ay) * duration2};
