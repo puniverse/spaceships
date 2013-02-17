@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public abstract class Spaceship {
     public static final int MAX_SHOOT_RANGE = 400;
-    public static final int TIMES_HITTED_TO_BLOW = 4;
+    public static final int TIMES_HITTED_TO_BLOW = 5;
 
     public long getBlowTime() {
         return blowTime;
@@ -83,11 +83,13 @@ public abstract class Spaceship {
                         final Spaceship self = this;
 
                         final RandSpatial random = global.random;
-                        if (self.blowTime>0 & global.currentTime() - self.blowTime > 500)
-                            return global.sb.delete(self.getToken());
+                        if (self.blowTime>0 & global.currentTime() - self.blowTime > 500) {
+                            global.replaceSpaceship(self,Spaceship.create(global));
+                            return null;
+                        }
                         if (self.blowTime>0) return null;
 
-                        if (global.currentTime() - self.getTimeShot() > 3000 && random.nextFloat() < 0.2)
+                        if (global.currentTime() - self.getTimeShot() > 3000 && random.nextFloat() < 0.1)
                             tryToShoot(self, global);
 
                         return global.sb.queryForUpdate(SpatialQueries.range(getAABB(), global.range), SpatialQueries.equals(getAABB()), new SpatialSetVisitor<Spaceship>() {
@@ -136,9 +138,9 @@ public abstract class Spaceship {
         if (timesHitted< TIMES_HITTED_TO_BLOW) {
             final double dx = shooter.x - x;
             final double dy = shooter.y - y;
-            final double d = mag(dx, dy);
+            double d = mag(dx, dy);
             if (d < MIN_PROXIMITY)
-                return;
+                d=MIN_PROXIMITY;
             final double udx = dx / d;
             final double udy = dy / d;
 
@@ -409,11 +411,12 @@ public abstract class Spaceship {
         final double udx = dx / d;
         final double udy = dy / d;
 
-        double hitRecoil = Math.max(-20000/d,-100);
+        double hitRecoil = 0.25 * d - 200; 
+//                Math.max(-20000/d,-100);
 
         reduceExAcc(global.currentTime());
-        exVx = hitRecoil * udx;
-        exVy = hitRecoil * udy;
+        exVx += hitRecoil * udx;
+        exVy += hitRecoil * udy;
         this.exAccUpdated = global.currentTime();
     }
 }

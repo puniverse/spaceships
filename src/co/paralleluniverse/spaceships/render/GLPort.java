@@ -162,7 +162,7 @@ public class GLPort implements GLEventListener {
             window.add(canvas);
             window.pack();
             canvas.requestFocusInWindow();
-            window.setSize(300, 300);
+            window.setSize(1200  , 700);
             window.setTitle("Spaceships");
             window.setVisible(true);
             this.window = window;

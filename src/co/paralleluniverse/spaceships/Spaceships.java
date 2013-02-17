@@ -21,7 +21,10 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -79,7 +82,7 @@ public class Spaceships {
     public final double range;
     private final ThreadPoolExecutor executor;
     public final RandSpatial random;
-    private final Spaceship[] ships;
+    private final ArrayList<Spaceship> ships = new ArrayList<>(10000);
     public final SpaceBase<Spaceship> sb;
     public final boolean extrapolate;
 
@@ -136,9 +139,8 @@ public class Spaceships {
 
         this.random = new RandSpatial();
 
-        this.ships = new Spaceship[N];
         for (int i = 0; i < N; i++)
-            ships[i] = Spaceship.create(this);
+            ships.add(Spaceship.create(this));
 
         this.sb = initSpaceBase(props);
         toolkit = GLPort.Toolkit.valueOf(props.getProperty("ui-component", "NEWT").toUpperCase());
@@ -146,6 +148,12 @@ public class Spaceships {
         println("UI Component: " + toolkit);
     }
 
+    public void replaceSpaceship(Spaceship toRemove, Spaceship s) {
+        ships.set(ships.indexOf(toRemove),s);
+        sb.delete(toRemove.getToken());
+        s.setToken(sb.insert(s, s.getAABB()));
+    }
+    
     private SpaceBase<Spaceship> initSpaceBase(Properties props) {
         final boolean optimistic = Boolean.parseBoolean(props.getProperty("optimistic", "true"));
         final int optimisticHeight = Integer.parseInt(props.getProperty("optimistic-height", "1"));
@@ -196,13 +204,8 @@ public class Spaceships {
         {
             System.out.println("Inserting " + N + " spaceships");
             long start = System.nanoTime();
-            for (int i = 0; i < N; i++) {
-                final Spaceship s = ships[i];
-                MutableAABB aabb = MutableAABB.create(dim);
-                s.getAABB(aabb);
-                final SpatialToken token = sb.insert(s, aabb);
-                token.join();
-                s.setToken(token);
+            for (Spaceship s:ships) {
+                insertSpaceship(s);
             }
             System.out.println("Inserted " + N + " things in " + millis(start));
         }
@@ -221,8 +224,7 @@ public class Spaceships {
 
             if (mode == 1) {
             } else {
-                for (int i = 0; i < N; i++) {
-                    final Spaceship s = ships[i];
+                for (final Spaceship s : ships){
                     if (executor == null) {
                         final Sync sync = s.run(Spaceships.this);
                         // sync.join();
@@ -311,5 +313,15 @@ public class Spaceships {
         if (configStream != null)
             configStream.println(str);
         System.out.println(str);
+    }
+
+    public void insertSpaceship(Spaceship s) throws InterruptedException {
+        if (!ships.contains(s))
+            ships.add(s);
+        MutableAABB aabb = MutableAABB.create(dim);
+        s.getAABB(aabb);
+        final SpatialToken token = sb.insert(s, aabb);
+        token.join();
+        s.setToken(token);
     }
 }
