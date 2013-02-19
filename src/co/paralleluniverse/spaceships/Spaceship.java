@@ -11,18 +11,14 @@ import co.paralleluniverse.spacebase.ElementUpdater;
 import co.paralleluniverse.spacebase.MutableAABB;
 import co.paralleluniverse.spacebase.SpatialModifyingVisitor;
 import co.paralleluniverse.spacebase.SpatialQueries;
-import co.paralleluniverse.spacebase.SpatialQuery;
-import co.paralleluniverse.spacebase.SpatialQuery.Result;
 import co.paralleluniverse.spacebase.SpatialSetVisitor;
 import co.paralleluniverse.spacebase.SpatialToken;
-import co.paralleluniverse.spacebase.SpatialVisitor;
 import co.paralleluniverse.spacebase.Sync;
 import co.paralleluniverse.spacebase.UpdateVisitor;
 import static java.lang.Math.cos;
 import static java.lang.Math.sin;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  *
@@ -30,7 +26,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public abstract class Spaceship {
     public static final int MAX_SHOOT_RANGE = 400;
-    public static final int TIMES_HITTED_TO_BLOW = 5;
+    public static final int TIMES_HITTED_TO_BLOW = 3;
 
     public long getBlowTime() {
         return blowTime;
