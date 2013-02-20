@@ -14,7 +14,6 @@ import co.paralleluniverse.spacebase.SpatialQueries;
 import co.paralleluniverse.spacebase.SpatialSetVisitor;
 import co.paralleluniverse.spacebase.SpatialToken;
 import co.paralleluniverse.spacebase.Sync;
-import co.paralleluniverse.spacebase.UpdateVisitor;
 import static java.lang.Math.cos;
 import static java.lang.Math.sin;
 import java.util.Set;
@@ -27,6 +26,20 @@ import java.util.concurrent.TimeUnit;
 public abstract class Spaceship {
     public static final int MAX_SHOOT_RANGE = 400;
     public static final int TIMES_HITTED_TO_BLOW = 3;
+    private static final double REJECTION_COEFF = 80000.0;
+    private static final double SPEED_LIMIT = 100.0;
+    private static final double SPEED_BOUNCE_DAMPING = 0.9;
+    private static final double MIN_PROXIMITY = 4;
+    public static final double HIT_RECOIL_VELOCITY = -100.0;
+    public static final int BLAST_RANGE = 200;
+    public static final int BLOW_TILL_DELETE_DURATION = 500;
+    public static final double SHOOT_PROBABLITY = 0.5;
+    public static final int SHOOT_INABILITY_DURATION = 3000;
+    private long lastMoved = -1L;
+    private long shootTime = 0;
+    private double shootLength = 10f;
+    private int timesHitted = 0;
+    private long blowTime = 0;
 
     public long getBlowTime() {
         return blowTime;
@@ -43,30 +56,6 @@ public abstract class Spaceship {
     private static Spaceship create(Spaceships global, int mode) {
         switch (mode) {
             case 4:
-                return new Spaceship(global) {
-                    @Override
-                    public String description() {
-                        return "Read set query to process neighbors, and an update in visit()";
-                    }
-
-                    @Override
-                    public Sync run(final Spaceships global) throws Exception {
-                        return global.sb.query(SpatialQueries.range(getAABB(), global.range), new SpatialSetVisitor<Spaceship>() {
-                            @Override
-                            public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
-                                process(resultReadOnly, global.currentTime());
-
-                                global.sb.update(token, new UpdateVisitor<Spaceship>() {
-                                    @Override
-                                    public AABB visit(Spaceship elem) {
-                                        move(global, global.currentTime());
-                                        return getAABB();
-                                    }
-                                });
-                            }
-                        });
-                    }
-                };
             case 5:
                 return new Spaceship(global) {
                     @Override
@@ -79,16 +68,19 @@ public abstract class Spaceship {
                         final Spaceship self = this;
 
                         final RandSpatial random = global.random;
-                        if (self.blowTime>0 & global.currentTime() - self.blowTime > 500) {
-                            global.replaceSpaceship(self,Spaceship.create(global));
+                        if (self.blowTime > 0 & global.currentTime() - self.blowTime > BLOW_TILL_DELETE_DURATION) {
+                            global.replaceSpaceship(self, Spaceship.create(global));
                             return null;
                         }
-                        if (self.blowTime>0) return null;
+                        if (self.blowTime > 0)
+                            return null;
 
-                        if (global.currentTime() - self.getTimeShot() > 3000 && random.nextFloat() < 1)
+                        if (global.currentTime() - self.getTimeShot() > SHOOT_INABILITY_DURATION
+                                && random.nextFloat() < SHOOT_PROBABLITY)
                             tryToShoot(self, global);
 
-                        return global.sb.queryForUpdate(SpatialQueries.range(getAABB(), global.range), SpatialQueries.equals(getAABB()), new SpatialSetVisitor<Spaceship>() {
+                        return global.sb.queryForUpdate(SpatialQueries.range(getAABB(), global.range),
+                                SpatialQueries.equals(getAABB()), new SpatialSetVisitor<Spaceship>() {
                             @Override
                             public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
                                 process(resultReadOnly, global.currentTime());
@@ -108,16 +100,6 @@ public abstract class Spaceship {
                 return null;
         }
     }
-    private static final double ATTRACTION = 2000.0;
-    private static final double REJECTION = 8000.0;
-    private static final double SPEED_LIMIT = 100.0;
-    private static final double SPEED_BOUNCE_DAMPING = 0.9;
-    private static final double MIN_PROXIMITY = 4;
-    private long lastMoved = -1L;
-    private long shootTime = 0;
-    private double shootLength = 10f;
-    private int timesHitted = 0;
-    private long blowTime = 0;
 
     public double getShootLength() {
         return shootLength;
@@ -131,42 +113,34 @@ public abstract class Spaceship {
     public void shot(final Spaceships global, Spaceship shooter) {
         this.timesHitted++;
         this.timeShot = global.currentTime();
-        if (timesHitted< TIMES_HITTED_TO_BLOW) {
+        if (timesHitted < TIMES_HITTED_TO_BLOW) {
             final double dx = shooter.x - x;
             final double dy = shooter.y - y;
             double d = mag(dx, dy);
             if (d < MIN_PROXIMITY)
-                d=MIN_PROXIMITY;
+                d = MIN_PROXIMITY;
             final double udx = dx / d;
             final double udy = dy / d;
 
-            double hitRecoil = -100;
-
             reduceExAcc(timeShot);
-            exVx += hitRecoil * udx;
-            exVy += hitRecoil * udy;
-            this.exAccUpdated = timeShot;
-            
-        } else if (blowTime==0) {
-            Sync queryForUpdate = global.sb.queryForUpdate(SpatialQueries.range(getAABB(), global.range*2),
+            exVx += HIT_RECOIL_VELOCITY * udx;
+            exVy += HIT_RECOIL_VELOCITY * udy;
+            this.exVelocityUpdated = timeShot;
+
+        } else if (blowTime == 0) { // push all the spaceship in the explosion range
+            global.sb.queryForUpdate(SpatialQueries.range(getAABB(), BLAST_RANGE),
                     new SpatialModifyingVisitor<Spaceship>() {
+                        @Override
+                        public void visit(ElementUpdater<Spaceship> updater) {
+                            updater.elem().blast(global, Spaceship.this);
+                        }
 
-                @Override
-                public void visit(ElementUpdater<Spaceship> updater) {
-                    updater.elem().blast(global,Spaceship.this);
-                }
-
-                @Override
-                public void done() {}
-            });
+                        @Override
+                        public void done() {
+                        }
+                    });
             blowTime = global.currentTime();
         }
-
-
-    }
-
-    public long getShootTime() {
-        return shootTime;
     }
     protected double x;
     protected double y;
@@ -174,15 +148,15 @@ public abstract class Spaceship {
     protected double vy;
     protected double ax;
     protected double ay;
-    protected long exAccUpdated = 0;
+
+    // external velocity (due to shoot or explostion hit, does not affect the heading)
+    protected long exVelocityUpdated = 0;
     protected double exVx = 0;
     protected double exVy = 0;
     protected double exAx = 0;
     protected double exAy = 0;
-    private volatile int neighbors;
     protected SpatialToken token;
 
-//    private final AtomicInteger neighborCounter = new AtomicInteger();
     public Spaceship(Spaceships global) {
         if (global == null)
             return;
@@ -203,7 +177,6 @@ public abstract class Spaceship {
 
     protected void process(Set<Spaceship> neighbors, long currentTime) {
         final int n = neighbors.size();
-        this.neighbors = n;
 
         ax = 0.0;
         ay = 0.0;
@@ -223,34 +196,6 @@ public abstract class Spaceship {
         processNeighbor(s, currentTime);
     }
 
-    protected void tryToShoot(final Spaceship self, final Spaceships global) {
-        double v = Math.sqrt(Math.pow(self.vx, 2) + Math.pow(self.vy, 2));
-        double x2 = self.x + self.vx / v * MAX_SHOOT_RANGE;
-        double y2 = self.y + self.vy / v * MAX_SHOOT_RANGE;
-
-        global.sb.queryForUpdate(SpatialQueries.NONE_QUERY, new LineQuery<Spaceship>(x + 1, x2, y + 1, y2), new SpatialSetVisitor<Spaceship>() {
-            @Override
-            public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
-                ElementUpdater<Spaceship> closeShip = null;
-                double minRange2 = Math.pow(MAX_SHOOT_RANGE, 2);
-                for (ElementUpdater<Spaceship> eu : resultForUpdate) {
-                    double rng2 = Math.pow(eu.elem().x - self.x, 2)
-                            + Math.pow(eu.elem().y - self.y, 2);
-                    if (rng2 > 100 & rng2 <= minRange2) { //not me and not so close
-                        minRange2 = rng2;
-                        closeShip = eu;
-                    }
-                    if (closeShip != null) {
-
-                        self.shootTime = global.currentTime();
-                        self.shootLength = Math.sqrt(minRange2);
-                        eu.elem().shot(global, self);
-                    }
-                }
-            }
-        });
-    }
-
     protected void processNeighbor(Spaceship s, long currentTime) {
         final double dx = s.x - x;
         final double dy = s.y - y;
@@ -258,25 +203,19 @@ public abstract class Spaceship {
         final double udx = dx / d;
         final double udy = dy / d;
 
-        double attraction = 0.0;
-        double rejection = 0.0;
-
-        double mult = 10;
-
-//        mult *= Math.max(-19/2000 * (currentTime-s.timeShot) + 20,1);
         if (d < MIN_PROXIMITY)
             d = MIN_PROXIMITY;
-//            attraction = 0 / (d * d);
-        rejection = Math.min(mult * REJECTION / (d * d),150);
-        
-        ax += (attraction - rejection) * udx;
-        ay += (attraction - rejection) * udy;
+        double rejection = Math.min(REJECTION_COEFF / (d * d), 150);
+
+        ax -= rejection * udx;
+        ay -= rejection * udy;
 
         assert !Double.isNaN(ax + ay);
     }
 
     public double[] getCurrentPosition(long currentTime) {
-        if (blowTime>0) currentTime=blowTime;
+        if (blowTime > 0)
+            currentTime = blowTime;
         double duration = (double) (currentTime - lastMoved) / TimeUnit.SECONDS.toMillis(1);
         double duration2 = duration * duration;// * Math.signum(duration);
         double pos[] = {x + (vx + exVx) * duration + (exAx + ax) * duration2, y + (vy + exVy) * duration + (exAy + ay) * duration2};
@@ -295,12 +234,12 @@ public abstract class Spaceship {
     }
 
     public void reduceExAcc(long currentTime) {
-        double duration = (double) (currentTime - exAccUpdated) / TimeUnit.SECONDS.toMillis(1);;
-        if (exAccUpdated > 0 & duration > 0) {
+        double duration = (double) (currentTime - exVelocityUpdated) / TimeUnit.SECONDS.toMillis(1);;
+        if (exVelocityUpdated > 0 & duration > 0) {
             exVx /= (1 + 8 * duration);
             exVy /= (1 + 8 * duration);
         }
-        exAccUpdated = currentTime;
+        exVelocityUpdated = currentTime;
 
     }
 
@@ -334,6 +273,51 @@ public abstract class Spaceship {
         }
         this.lastMoved = currentTime;
         reduceExAcc(currentTime);
+    }
+
+    protected void tryToShoot(final Spaceship self, final Spaceships global) {
+        double v = Math.sqrt(Math.pow(self.vx, 2) + Math.pow(self.vy, 2));
+        double x2 = self.x + self.vx / v * MAX_SHOOT_RANGE;
+        double y2 = self.y + self.vy / v * MAX_SHOOT_RANGE;
+
+        global.sb.queryForUpdate(SpatialQueries.NONE_QUERY, new LineQuery<Spaceship>(x + 1, x2, y + 1, y2), new SpatialSetVisitor<Spaceship>() {
+            @Override
+            public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
+                ElementUpdater<Spaceship> closeShip = null;
+                double minRange2 = Math.pow(MAX_SHOOT_RANGE, 2);
+                for (ElementUpdater<Spaceship> eu : resultForUpdate) {
+                    double rng2 = Math.pow(eu.elem().x - self.x, 2)
+                            + Math.pow(eu.elem().y - self.y, 2);
+                    if (rng2 > 100 & rng2 <= minRange2) { //not me and not so close
+                        minRange2 = rng2;
+                        closeShip = eu;
+                    }
+                    if (closeShip != null) {
+
+                        self.shootTime = global.currentTime();
+                        self.shootLength = Math.sqrt(minRange2);
+                        eu.elem().shot(global, self);
+                    }
+                }
+            }
+        });
+    }
+
+    private void blast(Spaceships global, Spaceship hitted) {
+        final double dx = hitted.x - x;
+        final double dy = hitted.y - y;
+        final double d = mag(dx, dy);
+        if (d < MIN_PROXIMITY)
+            return;
+        final double udx = dx / d;
+        final double udy = dy / d;
+
+        double hitRecoil = 0.25 * d - 200;
+
+        reduceExAcc(global.currentTime());
+        exVx += hitRecoil * udx;
+        exVy += hitRecoil * udy;
+        this.exVelocityUpdated = global.currentTime();
     }
 
     public long getLastMoved() {
@@ -382,14 +366,6 @@ public abstract class Spaceship {
         return y;
     }
 
-    public int getNeighbors() {
-        return neighbors;
-    }
-
-    protected void resetNeighbors() {
-        this.neighbors = 0;
-    }
-
     public SpatialToken getToken() {
         return token;
     }
@@ -398,21 +374,7 @@ public abstract class Spaceship {
         this.token = token;
     }
 
-    private void blast(Spaceships global, Spaceship hitted) {        
-        final double dx = hitted.x - x;
-        final double dy = hitted.y - y;
-        final double d = mag(dx, dy);
-        if (d < MIN_PROXIMITY)
-            return;
-        final double udx = dx / d;
-        final double udy = dy / d;
-
-        double hitRecoil = 0.25 * d - 200; 
-//                Math.max(-20000/d,-100);
-
-        reduceExAcc(global.currentTime());
-        exVx += hitRecoil * udx;
-        exVy += hitRecoil * udy;
-        this.exAccUpdated = global.currentTime();
+    public long getShootTime() {
+        return shootTime;
     }
 }

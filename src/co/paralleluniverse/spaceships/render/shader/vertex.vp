@@ -10,7 +10,6 @@ out float shootLength;
 void main()
 {
     gl_Position = vec4(in_Position, 1.0, 1.0);
-//    gl_PointSize = 10;
     pass_Color = in_Vertex[0];
     heading = in_Vertex[1];
     shootLength = in_Vertex[2];

@@ -6,7 +6,7 @@ in float pass_Color[1];
 in float heading[1];
 in float shootLength[1];
 uniform mat4 in_Matrix;
-out float tex;
+out float explosionTime;
 out vec2 vTexCoord;
 out float light;
 
@@ -15,7 +15,7 @@ out float light;
  void main()
 {
   vec4 lightSource = vec4(0.707,0,0.707,0);
-  tex = pass_Color[0];
+  explosionTime = pass_Color[0];
   float size = 16;  
   mat4 RotationMatrix = mat4( cos( heading[0] ), -sin( heading[0] ), 0.0, 0.0,
 			    sin( heading[0] ),  cos( heading[0] ), 0.0, 0.0,
