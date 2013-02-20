@@ -32,6 +32,7 @@ import java.io.InputStream;
 import java.nio.FloatBuffer;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.concurrent.TimeUnit;
 import javax.media.opengl.DebugGL3;
 import javax.media.opengl.GL;
 import javax.media.opengl.GL2ES2;
@@ -44,6 +45,7 @@ import javax.media.opengl.GLException;
 import javax.media.opengl.GLProfile;
 import javax.media.opengl.awt.GLCanvas;
 import javax.media.opengl.fixedfunc.GLMatrixFunc;
+import sun.nio.cs.ext.GB18030;
 
 /**
  * See:
@@ -57,24 +59,31 @@ public class GLPort implements GLEventListener {
     public static final int WINDOW_WIDTH = 1200;
     public static final int WINDOW_HEIGHT = 700;
     public static final double ZOOM_UNIT = 0.1;
-    public static final int ANIMATION_TIME = 200;
-    private long lastQuery = 0;
-    private Collection<Object> lastRes = null;
+    public static final int ANIMATION_DURATION = 200;
+    public static final int SHOOT_DURATION = 100;
+    public static final float EXPLOSION_DURATION = 500f;
+    public static final int MAX_EXTRAPOLATION_DURATION = 1000;
+    public static final int SB_QUERY_RATE = 200;
+    public static final int WIDTH_MARGINS = 800;
+    private long lastSBQueryTime = 0;
+    private Collection<Object> lastSBQueryResult = null;
+    private long lastSBCycleStart = 0;
     private Texture spaceshipTex;
     private Texture explosionTex;
     private ShaderProgram shaderProgram;
-    private long portUpdateTime = 0;
-    private double inProcessPortExtention;
     private int drawableWidth;
     private int drawableHeight;
+    private long portAnimationStartTime = 0;
+    private double inProcessPortExtention = 0;
 
     private MutableAABB getCurrentPort(final long ct) {
-        if (inProcessPortExtention==0) return port;
+        if (inProcessPortExtention == 0)
+            return port;
         MutableAABB currentPort = MutableAABB.create(2);
         final double width = port.max(X) - port.min(X);
         final double height = port.max(Y) - port.min(Y);
         final double ratio = height / width;
-        double animation = Math.min(1.0,(double)(ct-portUpdateTime)/ANIMATION_TIME);
+        double animation = Math.min(1.0, (double) (ct - portAnimationStartTime) / ANIMATION_DURATION);
         currentPort.min(X, port.min(X) - animation * inProcessPortExtention);
         currentPort.min(Y, port.min(Y) - animation * inProcessPortExtention * ratio);
         currentPort.max(X, port.max(X) + animation * inProcessPortExtention);
@@ -86,16 +95,17 @@ public class GLPort implements GLEventListener {
         final double width = port.max(X) - port.min(X);
         final double height = port.max(Y) - port.min(Y);
         final double ratio = height / width;
-        double animation = Math.min(1.0,(double)(ct-portUpdateTime)/ANIMATION_TIME);
-        if (onlyIfFinished & animation<1.0) return;
+        double animation = Math.min(1.0, (double) (ct - portAnimationStartTime) / ANIMATION_DURATION);
+        if (onlyIfFinished & animation < 1.0)
+            return;
         double kk = width + 2 * inProcessPortExtention;
         port.min(X, port.min(X) - animation * inProcessPortExtention);
         port.min(Y, port.min(Y) - animation * inProcessPortExtention * ratio);
         port.max(X, port.max(X) + animation * inProcessPortExtention);
         port.max(Y, port.max(Y) + animation * inProcessPortExtention * ratio);
         inProcessPortExtention -= animation * inProcessPortExtention;
-        System.out.println("KKKK2 "+kk+"\t"+((port.max(X)-port.min(X)+2*inProcessPortExtention)));
-        portUpdateTime = ct;
+//        System.out.println("KKKK2 "+kk+"\t"+((port.max(X)-port.min(X)+2*inProcessPortExtention)));
+        portAnimationStartTime = ct;
     }
 
     public enum Toolkit {
@@ -132,6 +142,14 @@ public class GLPort implements GLEventListener {
         final GLProfile glp = GLProfile.get(GLProfile.GL3);
         final GLCapabilitiesImmutable glcaps = (GLCapabilitiesImmutable) new GLCapabilities(glp);
         final GLAutoDrawable drawable;
+        final GLCapabilities tGLCapabilities = new GLCapabilities(glp);
+        tGLCapabilities.setSampleBuffers(true);
+        tGLCapabilities.setNumSamples(1);
+
+//            tGLCapabilities.setAccumAlphaBits(16);
+//            tGLCapabilities.setAccumBlueBits(16);
+//            tGLCapabilities.setAccumGreenBits(16);
+//            tGLCapabilities.setAccumRedBits(16);
 
         if (TOOLKIT == Toolkit.NEWT || TOOLKIT == Toolkit.NEWT_CANVAS) {
             final GLWindow newt = GLWindow.create(glcaps);
@@ -218,10 +236,9 @@ public class GLPort implements GLEventListener {
             // This icon is under the LGPL license
             // by Everaldo Coelho
             InputStream stream = new FileInputStream("spaceship.png");
-            TextureData data = TextureIO.newTextureData(GLProfile.get(GLProfile.GL3),stream, false, "png");
+            TextureData data = TextureIO.newTextureData(GLProfile.get(GLProfile.GL3), stream, false, "png");
             spaceshipTex = TextureIO.newTexture(data);
-        }
-        catch (IOException exc) {
+        } catch (IOException exc) {
             exc.printStackTrace();
             System.exit(1);
         }
@@ -229,10 +246,9 @@ public class GLPort implements GLEventListener {
             // This icon is under the license "Creative Commons Attribution-Share Alike 3.0"
             // by Christian "Crystan" Hoffmann
             InputStream stream = new FileInputStream("explosion.png");
-            TextureData data = TextureIO.newTextureData(GLProfile.get(GLProfile.GL3),stream, false, "png");
+            TextureData data = TextureIO.newTextureData(GLProfile.get(GLProfile.GL3), stream, false, "png");
             explosionTex = TextureIO.newTexture(data);
-        }
-        catch (IOException exc) {
+        } catch (IOException exc) {
             exc.printStackTrace();
             System.exit(1);
         }
@@ -270,7 +286,6 @@ public class GLPort implements GLEventListener {
         this.shaderState = new ProgramState(gl, shaderProgram);
         shaderState.bind(gl);
 
-        //portToMvMatrix();
         pmv.glMatrixMode(GLMatrixFunc.GL_PROJECTION);
         pmv.glLoadIdentity();
 
@@ -282,10 +297,6 @@ public class GLPort implements GLEventListener {
 
         vao.setVertex(gl, "in_Position", vertices);
         vao.setVertex(gl, "in_Vertex", colors);
-
-//        shaderState.setUniform(gl, "myTexture", myTexture);
-        //shaderState.createUBO(gl, "MatrixBlock");
-        //shaderState.getUBO("MatrixBlock").bind(gl).set(gl, "PMatrix", 4, 4, pmv.glGetMvMatrixf());
 
         shaderState.unbind(gl);
     }
@@ -308,19 +319,15 @@ public class GLPort implements GLEventListener {
 
     public Collection<Object> query(SpatialQuery<? super Spaceship> query) {
         try {
-            final Collection<Object> resultSet =  sb.createCollection();
-//            final ConcurrentHashMap resultSet = new ConcurrentHashMap(100);
+            final Collection<Object> resultSet = sb.createCollection();
             sb.query(query, new SpatialVisitor<Spaceship>() {
                 @Override
                 public void visit(Spaceship elem, SpatialToken token) {
                     resultSet.add(elem);
                 }
-
                 @Override
-                public void done() {
-                }
+                public void done() {}
             }).join();
-
             return Collections.unmodifiableCollection(resultSet);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
@@ -329,7 +336,6 @@ public class GLPort implements GLEventListener {
 
     @Override
     public void display(GLAutoDrawable drawable) {
-//        System.out.println("KKKK START");
         final GL3 gl = drawable.getGL().getGL3();
         shaderState.bind(gl);
         vao.bind(gl);
@@ -342,44 +348,44 @@ public class GLPort implements GLEventListener {
         gl.glUniform1i(explosionLoc, 1);
         gl.glActiveTexture(GL.GL_TEXTURE0 + 1);
         gl.glBindTexture(GL.GL_TEXTURE_2D, explosionTex.getTextureObject(gl));
-//        spaceshipTex.enable(gl);
-//        spaceshipTex.bind(gl);
-//        gl.glActiveTexture(GL.GL_TEXTURE1);
-//        explosionTex.enable(gl);
-//        explosionTex.bind(gl);
-//        shaderState.setUniform(gl, "myTexture", spaceshipTex.getTextureObject(gl));
 
         vertices.clear();
         colors.clear();
         final FloatBuffer verticesb = (FloatBuffer) vertices.getBuffer();
         final FloatBuffer colorsb = (FloatBuffer) colors.getBuffer();
-        float col, head;
         long ct = System.currentTimeMillis();
-        fixPortToNow(ct,true);
+        fixPortToNow(ct, true);
         MutableAABB currentPort = getCurrentPort(ct);
         portToMvMatrix(currentPort);
-        double m = global.range *2;
-
-        if (ct - lastQuery > 100) {
-            lastQuery = ct;
-            lastRes = query(SpatialQueries.contained(AABB.create(currentPort.min(X)-m,currentPort.max(X)+m,currentPort.min(Y)-m,currentPort.max(Y)+m)));
+        double margins = WIDTH_MARGINS; 
+        if (ct - lastSBQueryTime > SB_QUERY_RATE | lastSBCycleStart != global.getCycleStart()) {
+            lastSBQueryTime = ct;
+            lastSBQueryResult = query(SpatialQueries.contained(AABB.create(currentPort.min(X) - margins, currentPort.max(X) + margins, currentPort.min(Y) - margins, currentPort.max(Y) + margins)));
+            lastSBCycleStart = global.getCycleStart();
         }
-        if (!global.extrapolate)
-            ct = lastQuery;
         double[] pos;
-        for (Object o : lastRes) {
+        for (Object o : lastSBQueryResult) {
             Spaceship s = (Spaceship) o;
             if (s.getLastMoved() > 0) {
-                pos = s.getCurrentPosition(ct);
-                col = Math.min(1.0f, 0.1f + (float) s.getNeighbors() / 10.0f);
-                verticesb.put((float)pos[0]);
-                verticesb.put((float)pos[1]);
-                if (s.getBlowTime()>0) {
-                    colorsb.put(Math.min(1.0f, (ct-s.getBlowTime())/500f));                                        
-                } else                     
-                    colorsb.put(0);
-                colorsb.put((float) s.getCurrentHeading(ct));
-                colorsb.put(ct - s.getShootTime() < 100 ? (float)s.getShootLength() : 0f);
+                long exrapolationTime;
+
+                if (global.extrapolate)
+                    // don't extrapolate spaceships that have npt been moved a long time
+                    exrapolationTime = Math.min(ct, s.getLastMoved() + MAX_EXTRAPOLATION_DURATION);
+                else
+                    exrapolationTime = s.getLastMoved();
+                pos = s.getCurrentPosition(exrapolationTime);
+                verticesb.put((float) pos[0]);
+                verticesb.put((float) pos[1]);
+
+                if (s.getBlowTime() > 0) { // 0.01 - start blow animation, 1.0 - end od animation
+                    colorsb.put(Math.min(1.0f, (ct - s.getBlowTime()) / EXPLOSION_DURATION));
+                } else
+                    colorsb.put(0); // regular ship without blow
+                colorsb.put((float) s.getCurrentHeading(exrapolationTime));
+
+                // put the shootLength (0 for ship wihout shoot)
+                colorsb.put(ct - s.getShootTime() < SHOOT_DURATION ? (float) s.getShootLength() : 0f);
             }
         }
 
@@ -408,8 +414,8 @@ public class GLPort implements GLEventListener {
         final GL2ES2 gl = drawable.getGL().getGL2ES2();
 
         gl.glViewport(0, 0, width, height);
-        port.max(X, port.min(X) + (double) width / drawableWidth * (port.max(X)-port.min(X)));
-        port.max(Y, port.min(Y) + (double) height / drawableHeight * (port.max(Y)-port.min(Y)));
+        port.max(X, port.min(X) + (double) width / drawableWidth * (port.max(X) - port.min(X)));
+        port.max(Y, port.min(Y) + (double) height / drawableHeight * (port.max(Y) - port.min(Y)));
         drawableHeight = height;
         drawableWidth = width;
         portToMvMatrix(port);
@@ -449,36 +455,26 @@ public class GLPort implements GLEventListener {
         portToMvMatrix(port);
     }
 
-        private void scalePort(boolean zoomIn, double units) {
-        //pmv.glMatrixMode(GLMatrixFunc.GL_MODELVIEW);
+    private void scalePort(boolean zoomIn, double units) {
         final long ct = System.currentTimeMillis();
         fixPortToNow(ct, false);
         final double width = port.max(X) - port.min(X);
         final double height = port.max(Y) - port.min(Y);
         final double ratio = height / width;
         final double widthToAdd = width * ZOOM_UNIT * units;
-        
-//        if (addToPort!=0) return; //don't scale during previous scale    
-        if (zoomIn) {
-            if ((width+2*(-widthToAdd +inProcessPortExtention) > 400) & (height+2*((-widthToAdd +inProcessPortExtention)*ratio) > 400 * ratio)) {
-                inProcessPortExtention -= widthToAdd;
-//                port = getCurrentPort(ct);
+
+        if (units<0) {
+            if ((width + 2 * (widthToAdd + inProcessPortExtention) > 400) & (height + 2 * ((widthToAdd + inProcessPortExtention) * ratio) > 400 * ratio)) {
+                inProcessPortExtention += widthToAdd;
             }
         } else { // zoomout
-            if ((bounds.min(X) < port.min(X) - inProcessPortExtention - widthToAdd) &
-                (bounds.min(Y) < port.min(Y) - inProcessPortExtention - widthToAdd * ratio) &
-                (bounds.max(X) > port.max(X) + inProcessPortExtention + widthToAdd) &
-                (bounds.max(Y) > port.max(Y) + inProcessPortExtention + widthToAdd * ratio)) {
+            if ((bounds.min(X) < port.min(X) - inProcessPortExtention - widthToAdd)
+                    & (bounds.min(Y) < port.min(Y) - inProcessPortExtention - widthToAdd * ratio)
+                    & (bounds.max(X) > port.max(X) + inProcessPortExtention + widthToAdd)
+                    & (bounds.max(Y) > port.max(Y) + inProcessPortExtention + widthToAdd * ratio)) {
                 inProcessPortExtention += widthToAdd;
-//                port = getCurrentPort(ct);
-//                port.min(X, port.min(X) - units * KEY_RATIO_TRANSLATE);
-//                port.min(Y, port.min(Y) - units * KEY_RATIO_TRANSLATE * ratio);
-//                port.max(X, port.max(X) + units * KEY_RATIO_TRANSLATE);
-//                port.max(Y, port.max(Y) + units * KEY_RATIO_TRANSLATE * ratio);
             }
         }
-        System.out.println("KKKK3 "+((port.max(X)-port.min(X))+2*inProcessPortExtention));
-//        portToMvMatrix(port);
     }
 
     private void print(FloatBuffer buffer) {
@@ -571,17 +567,21 @@ public class GLPort implements GLEventListener {
                     movePort(true, 1);
                     break;
                 case com.jogamp.newt.event.KeyEvent.VK_EQUALS:
-                    scalePort(zoomIn, 1);
+                    scalePort(zoomIn, -1);
                     break;
                 case com.jogamp.newt.event.KeyEvent.VK_MINUS:
-                    scalePort(!zoomIn, 1);
+                    scalePort(!zoomIn, +1);
                     break;
             }
         }
 
         @Override
         public void mouseWheelMoved(com.jogamp.newt.event.MouseEvent e) {
-            movePort(e.isShiftDown(), -1 * (e.isShiftDown() ? 1 : -1) * e.getWheelRotation());
+            if (e.isControlDown()) {
+                scalePort(true, (int) e.getWheelRotation()/2);                
+            } else {
+                movePort(e.isShiftDown(), -1 * (e.isShiftDown() ? 1 : -1) * e.getWheelRotation());
+            }
         }
 
         @Override

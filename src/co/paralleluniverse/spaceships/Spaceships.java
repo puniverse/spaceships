@@ -85,6 +85,7 @@ public class Spaceships {
     private final ArrayList<Spaceship> ships = new ArrayList<>(10000);
     public final SpaceBase<Spaceship> sb;
     public final boolean extrapolate;
+    private long cycleStart;
 
     public Spaceships(Properties props) throws Exception {
         this.dim = 2;
@@ -203,11 +204,11 @@ public class Spaceships {
     private void run() throws Exception {
         {
             System.out.println("Inserting " + N + " spaceships");
-            long start = System.nanoTime();
+            cycleStart = System.nanoTime();
             for (Spaceship s:ships) {
                 insertSpaceship(s);
             }
-            System.out.println("Inserted " + N + " things in " + millis(start));
+            System.out.println("Inserted " + N + " things in " + millis(cycleStart));
         }
 
 //        out.println("Sleeping for 5 seconds....");
@@ -264,6 +265,10 @@ public class Spaceships {
                 timeStream.println(k + "," + millis + "," + millis1 + "," + millis0);
             System.out.println("XXX: " + millis + " queue: " + sb.getQueueLength() + (executor != null ? " executorQueue: " + executor.getQueue().size() : ""));
         }
+    }
+
+    public long getCycleStart() {
+        return cycleStart;
     }
 
     private void updateAll() {

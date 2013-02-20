@@ -85,7 +85,7 @@ public abstract class Spaceship {
                         }
                         if (self.blowTime>0) return null;
 
-                        if (global.currentTime() - self.getTimeShot() > 3000 && random.nextFloat() < 0.1)
+                        if (global.currentTime() - self.getTimeShot() > 3000 && random.nextFloat() < 1)
                             tryToShoot(self, global);
 
                         return global.sb.queryForUpdate(SpatialQueries.range(getAABB(), global.range), SpatialQueries.equals(getAABB()), new SpatialSetVisitor<Spaceship>() {
