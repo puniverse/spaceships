@@ -65,6 +65,8 @@ public class GLPort implements GLEventListener {
     public static final int MAX_EXTRAPOLATION_DURATION = 1000;
     public static final int SB_QUERY_RATE = 200;
     public static final int WIDTH_MARGINS = 800;
+    public static final int MAX_PORT_WIDTH = 400;
+    public static final String WINDOW_TITLE = "Spaceships";
     private long lastSBQueryTime = 0;
     private Collection<Object> lastSBQueryResult = null;
     private long lastSBCycleStart = 0;
@@ -74,37 +76,41 @@ public class GLPort implements GLEventListener {
     private int drawableWidth;
     private int drawableHeight;
     private long portAnimationStartTime = 0;
-    private double inProcessPortExtention = 0;
+    private double portMaxXAnimation = 0;
+    private double portMinXAnimation = 0;
+    private double portMaxYAnimation = 0;
+    private double portMinYAnimation = 0;
 
     private MutableAABB getCurrentPort(final long ct) {
-        if (inProcessPortExtention == 0)
+        if (portMaxXAnimation == 0)
             return port;
         MutableAABB currentPort = MutableAABB.create(2);
         final double width = port.max(X) - port.min(X);
         final double height = port.max(Y) - port.min(Y);
         final double ratio = height / width;
         double animation = Math.min(1.0, (double) (ct - portAnimationStartTime) / ANIMATION_DURATION);
-        currentPort.min(X, port.min(X) - animation * inProcessPortExtention);
-        currentPort.min(Y, port.min(Y) - animation * inProcessPortExtention * ratio);
-        currentPort.max(X, port.max(X) + animation * inProcessPortExtention);
-        currentPort.max(Y, port.max(Y) + animation * inProcessPortExtention * ratio);
+        currentPort.min(X, port.min(X) + animation * portMinXAnimation);
+        currentPort.min(Y, port.min(Y) + animation * portMinYAnimation);
+        currentPort.max(X, port.max(X) + animation * portMaxXAnimation);
+        currentPort.max(Y, port.max(Y) + animation * portMaxYAnimation);
         return currentPort;
     }
 
-    private void fixPortToNow(final long ct, boolean onlyIfFinished) {
+    private void fixPort(final long ct, boolean onlyIfFinished) {
         final double width = port.max(X) - port.min(X);
         final double height = port.max(Y) - port.min(Y);
         final double ratio = height / width;
         double animation = Math.min(1.0, (double) (ct - portAnimationStartTime) / ANIMATION_DURATION);
         if (onlyIfFinished & animation < 1.0)
             return;
-        double kk = width + 2 * inProcessPortExtention;
-        port.min(X, port.min(X) - animation * inProcessPortExtention);
-        port.min(Y, port.min(Y) - animation * inProcessPortExtention * ratio);
-        port.max(X, port.max(X) + animation * inProcessPortExtention);
-        port.max(Y, port.max(Y) + animation * inProcessPortExtention * ratio);
-        inProcessPortExtention -= animation * inProcessPortExtention;
-//        System.out.println("KKKK2 "+kk+"\t"+((port.max(X)-port.min(X)+2*inProcessPortExtention)));
+        port.min(X, port.min(X) + animation * portMinXAnimation);
+        port.min(Y, port.min(Y) + animation * portMinYAnimation);
+        port.max(X, port.max(X) + animation * portMaxXAnimation);
+        port.max(Y, port.max(Y) + animation * portMaxYAnimation);
+        portMaxXAnimation -= animation * portMaxXAnimation;
+        portMinXAnimation -= animation * portMinXAnimation;
+        portMaxYAnimation -= animation * portMaxYAnimation;
+        portMinYAnimation -= animation * portMinYAnimation;
         portAnimationStartTime = ct;
     }
 
@@ -185,7 +191,7 @@ public class GLPort implements GLEventListener {
                 }
             });
             window.setSize(WINDOW_WIDTH, WINDOW_HEIGHT);
-            window.setTitle("Spaceships");
+            window.setTitle(WINDOW_TITLE);
             window.setVisible(true);
             this.window = window;
         } else {
@@ -212,7 +218,7 @@ public class GLPort implements GLEventListener {
             window.pack();
             canvas.requestFocusInWindow();
             window.setSize(WINDOW_WIDTH, WINDOW_HEIGHT);
-            window.setTitle("Spaceships");
+            window.setTitle(WINDOW_TITLE);
             window.setVisible(true);
             this.window = window;
         }
@@ -325,8 +331,10 @@ public class GLPort implements GLEventListener {
                 public void visit(Spaceship elem, SpatialToken token) {
                     resultSet.add(elem);
                 }
+
                 @Override
-                public void done() {}
+                public void done() {
+                }
             }).join();
             return Collections.unmodifiableCollection(resultSet);
         } catch (InterruptedException e) {
@@ -354,10 +362,10 @@ public class GLPort implements GLEventListener {
         final FloatBuffer verticesb = (FloatBuffer) vertices.getBuffer();
         final FloatBuffer colorsb = (FloatBuffer) colors.getBuffer();
         long ct = System.currentTimeMillis();
-        fixPortToNow(ct, true);
+        fixPort(ct, true);
         MutableAABB currentPort = getCurrentPort(ct);
         portToMvMatrix(currentPort);
-        double margins = WIDTH_MARGINS; 
+        double margins = WIDTH_MARGINS;
         if (ct - lastSBQueryTime > SB_QUERY_RATE | lastSBCycleStart != global.getCycleStart()) {
             lastSBQueryTime = ct;
             lastSBQueryResult = query(SpatialQueries.contained(AABB.create(currentPort.min(X) - margins, currentPort.max(X) + margins, currentPort.min(Y) - margins, currentPort.max(Y) + margins)));
@@ -393,20 +401,16 @@ public class GLPort implements GLEventListener {
         colors.flip();
 
         int numElems = verticesb.limit() / 2;
-//        System.out.println("KKKK SHIPS\t" + numElems + "\t" + sb.size() + "\t" + realQuery);
         vertices.write(gl, 0, numElems);
         colors.write(gl, 0, numElems);
 
         shaderState.setUniform(gl, "in_Matrix", 4, 4, pmv.glGetMvMatrixf());
-//        shaderState.setUniform(gl, "myTexture",myTexture.getTextureObject(gl));
-        //shaderState.getUBO("MatrixBlock").set(gl, "PMatrix", 4, 4, pmv.glGetMvMatrixf());
 
         gl.glClear(gl.GL_COLOR_BUFFER_BIT);
         gl.glDrawArrays(gl.GL_POINTS, 0, numElems);
 
         vao.unbind(gl);
         shaderState.unbind(gl);
-//        System.out.println("KKKK END");
     }
 
     @Override
@@ -424,55 +428,62 @@ public class GLPort implements GLEventListener {
 
     private void movePort(boolean horizontal, double units) {
         //pmv.glMatrixMode(GLMatrixFunc.GL_MODELVIEW);
+        final long ct = System.currentTimeMillis();
+        fixPort(ct, false);
+
         final double width = port.max(X) - port.min(X);
         final double height = port.max(Y) - port.min(Y);
 
+        double moveStep = units * KEY_PRESS_TRANSLATE;
+
         if (horizontal) {
-            //pmv.glTranslatef(-units * KEY_PRESS_TRANSLATE, 0f, 0f);
-            if (port.min(X) + units * KEY_PRESS_TRANSLATE < bounds.min(X)) {
-                port.min(X, bounds.min(X));
-                port.max(X, port.min(X) + width);
-            } else if (port.max(X) + units * KEY_PRESS_TRANSLATE > bounds.max(X)) {
-                port.max(X, bounds.max(X));
-                port.min(X, port.max(X) - width);
-            } else {
-                port.min(X, port.min(X) + units * KEY_PRESS_TRANSLATE);
-                port.max(X, port.max(X) + units * KEY_PRESS_TRANSLATE);
+            int dim = X;
+            if (port.min(dim) + portMinXAnimation + moveStep < bounds.min(dim)) {
+                moveStep = bounds.min(dim) - port.min(dim);
+            } else if (port.max(dim) + portMaxXAnimation + moveStep > bounds.max(dim)) {
+                moveStep = bounds.max(dim) - port.max(dim);
             }
+            portMinXAnimation += moveStep;
+            portMaxXAnimation += moveStep;
         } else {
-            //pmv.glTranslatef(0f, -units * KEY_PRESS_TRANSLATE, 0f);
-            if (port.min(Y) + units * KEY_PRESS_TRANSLATE < bounds.min(Y)) {
-                port.min(Y, bounds.min(Y));
-                port.max(Y, port.min(Y) + height);
-            } else if (port.max(Y) + units * KEY_PRESS_TRANSLATE > bounds.max(Y)) {
-                port.max(Y, bounds.max(Y));
-                port.min(Y, port.max(Y) - height);
-            } else {
-                port.min(Y, port.min(Y) + units * KEY_PRESS_TRANSLATE);
-                port.max(Y, port.max(Y) + units * KEY_PRESS_TRANSLATE);
+            int dim = Y;
+            if (port.min(dim) + portMinYAnimation + moveStep < bounds.min(dim)) {
+                moveStep = bounds.min(dim) - port.min(dim);
+            } else if (port.max(dim) + portMaxYAnimation + moveStep > bounds.max(dim)) {
+                moveStep = bounds.max(dim) - port.max(dim);
             }
+            portMinYAnimation += moveStep;
+            portMaxYAnimation += moveStep;
         }
-        portToMvMatrix(port);
+//        portToMvMatrix(port);
     }
 
-    private void scalePort(boolean zoomIn, double units) {
+    private void scalePort(double units) {
         final long ct = System.currentTimeMillis();
-        fixPortToNow(ct, false);
+        fixPort(ct, false);
         final double width = port.max(X) - port.min(X);
         final double height = port.max(Y) - port.min(Y);
         final double ratio = height / width;
         final double widthToAdd = width * ZOOM_UNIT * units;
+        final double heightToAdd = width * ZOOM_UNIT * units * ratio;
 
-        if (units<0) {
-            if ((width + 2 * (widthToAdd + inProcessPortExtention) > 400) & (height + 2 * ((widthToAdd + inProcessPortExtention) * ratio) > 400 * ratio)) {
-                inProcessPortExtention += widthToAdd;
+        if (units < 0) {
+            if ((width + 2 * widthToAdd + portMaxXAnimation - portMinXAnimation > MAX_PORT_WIDTH)
+                    & (height + 2 * heightToAdd + portMaxYAnimation - portMinYAnimation > MAX_PORT_WIDTH * ratio)) {
+                portMaxXAnimation += widthToAdd;
+                portMinXAnimation -= widthToAdd;
+                portMaxYAnimation += heightToAdd;
+                portMinYAnimation -= heightToAdd;
             }
         } else { // zoomout
-            if ((bounds.min(X) < port.min(X) - inProcessPortExtention - widthToAdd)
-                    & (bounds.min(Y) < port.min(Y) - inProcessPortExtention - widthToAdd * ratio)
-                    & (bounds.max(X) > port.max(X) + inProcessPortExtention + widthToAdd)
-                    & (bounds.max(Y) > port.max(Y) + inProcessPortExtention + widthToAdd * ratio)) {
-                inProcessPortExtention += widthToAdd;
+            if ((bounds.min(X) < port.min(X) + portMinXAnimation - widthToAdd)
+                    & (bounds.min(Y) < port.min(Y) + portMinYAnimation - heightToAdd)
+                    & (bounds.max(X) > port.max(X) + portMaxXAnimation + widthToAdd)
+                    & (bounds.max(Y) > port.max(Y) + portMaxYAnimation + heightToAdd)) {
+                portMaxXAnimation += widthToAdd;
+                portMinXAnimation -= widthToAdd;
+                portMaxYAnimation += heightToAdd;
+                portMinYAnimation -= heightToAdd;
             }
         }
     }
@@ -486,29 +497,50 @@ public class GLPort implements GLEventListener {
         buffer.position(pos);
     }
 
+    public void myKeyPressed(int keyCode) {
+        switch (keyCode) {
+            case com.jogamp.newt.event.KeyEvent.VK_UP:
+                movePort(false, 5);
+                break;
+            case com.jogamp.newt.event.KeyEvent.VK_DOWN:
+                movePort(false, -5);
+                break;
+            case com.jogamp.newt.event.KeyEvent.VK_LEFT:
+                movePort(true, -5);
+                break;
+            case com.jogamp.newt.event.KeyEvent.VK_RIGHT:
+                movePort(true, 5);
+                break;
+            case com.jogamp.newt.event.KeyEvent.VK_EQUALS:
+                scalePort(-1); // reduce port
+                break;
+            case com.jogamp.newt.event.KeyEvent.VK_MINUS:
+                scalePort(+1); //extend port
+                break;
+        }
+    }
+
+    public void myMouseWheelMoved(boolean idControlDown, float wheelRotation, boolean isShiftDown) {
+        if (idControlDown) {
+            scalePort((int) Math.signum(wheelRotation));
+        } else {
+            movePort(isShiftDown, -1 * (isShiftDown ? 1 : -1) * wheelRotation);
+        }
+    }
+
     private class AwtListener implements java.awt.event.KeyListener, java.awt.event.MouseListener, java.awt.event.MouseMotionListener, java.awt.event.MouseWheelListener {
         @Override
         public void keyPressed(java.awt.event.KeyEvent e) {
             int keyCode = e.getKeyCode();
-            switch (keyCode) {
-                case java.awt.event.KeyEvent.VK_UP:
-                    movePort(false, 1);
-                    break;
-                case java.awt.event.KeyEvent.VK_DOWN:
-                    movePort(false, -1);
-                    break;
-                case java.awt.event.KeyEvent.VK_LEFT:
-                    movePort(true, -1);
-                    break;
-                case java.awt.event.KeyEvent.VK_RIGHT:
-                    movePort(true, 1);
-                    break;
-            }
+            myKeyPressed(keyCode);
         }
 
         @Override
         public void mouseWheelMoved(java.awt.event.MouseWheelEvent e) {
-            movePort(e.isShiftDown(), (e.isShiftDown() ? 1 : -1) * e.getWheelRotation());
+            final boolean idControlDown = e.isControlDown();
+            final boolean isShiftDown = e.isShiftDown();
+            final float wheelRotation = e.getWheelRotation();
+            myMouseWheelMoved(idControlDown, wheelRotation, isShiftDown);
         }
 
         @Override
@@ -552,36 +584,15 @@ public class GLPort implements GLEventListener {
         @Override
         public void keyPressed(com.jogamp.newt.event.KeyEvent e) {
             int keyCode = e.getKeyCode();
-            final boolean zoomIn = true;
-            switch (keyCode) {
-                case com.jogamp.newt.event.KeyEvent.VK_UP:
-                    movePort(false, 1);
-                    break;
-                case com.jogamp.newt.event.KeyEvent.VK_DOWN:
-                    movePort(false, -1);
-                    break;
-                case com.jogamp.newt.event.KeyEvent.VK_LEFT:
-                    movePort(true, -1);
-                    break;
-                case com.jogamp.newt.event.KeyEvent.VK_RIGHT:
-                    movePort(true, 1);
-                    break;
-                case com.jogamp.newt.event.KeyEvent.VK_EQUALS:
-                    scalePort(zoomIn, -1);
-                    break;
-                case com.jogamp.newt.event.KeyEvent.VK_MINUS:
-                    scalePort(!zoomIn, +1);
-                    break;
-            }
+            myKeyPressed(keyCode);
         }
 
         @Override
         public void mouseWheelMoved(com.jogamp.newt.event.MouseEvent e) {
-            if (e.isControlDown()) {
-                scalePort(true, (int) e.getWheelRotation()/2);                
-            } else {
-                movePort(e.isShiftDown(), -1 * (e.isShiftDown() ? 1 : -1) * e.getWheelRotation());
-            }
+            final boolean idControlDown = e.isControlDown();
+            final boolean isShiftDown = e.isShiftDown();
+            final float wheelRotation = e.getWheelRotation();
+            myMouseWheelMoved(idControlDown, wheelRotation, isShiftDown);
         }
 
         @Override
