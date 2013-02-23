@@ -14,6 +14,7 @@ import co.paralleluniverse.spacebase.SpaceBaseExecutors;
 import co.paralleluniverse.spacebase.SpatialJoinVisitor;
 import co.paralleluniverse.spacebase.SpatialModifyingVisitor;
 import co.paralleluniverse.spacebase.SpatialQueries;
+import co.paralleluniverse.spacebase.SpatialSetVisitor;
 import co.paralleluniverse.spacebase.SpatialToken;
 import co.paralleluniverse.spacebase.Sync;
 import co.paralleluniverse.spaceships.render.GLPort;
@@ -22,6 +23,7 @@ import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.PrintStream;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -171,6 +173,7 @@ public class Spaceships {
             builder.setExecutor(SpaceBaseExecutors.concurrent(CLEANUP_THREADS));
 
         builder.setQueueBackpressure(1000);
+        builder.setContentionBackpressure(990);
         
         if (optimistic)
             builder.setOptimisticLocking(optimisticHeight, optimisticRetryLimit);
@@ -205,14 +208,13 @@ public class Spaceships {
             System.out.println("Inserted " + N + " things in " + millis(start));
         }
 
-//        out.println("Sleeping for 5 seconds....");
-//        Thread.sleep(5000);
-
         GLPort port = new GLPort(toolkit, N, sb, bounds);
         if (timeStream != null)
             timeStream.println("# time, millis, millis1, millis0");
 
         sb.setCurrentThreadAsynchronous(async);
+        
+        final long begin = System.currentTimeMillis();
         for (int k = 0;; k++) {
             long start = System.nanoTime();
             float millis0, millis1, millis;
@@ -230,6 +232,7 @@ public class Spaceships {
                     final Spaceship s = ships[i];
                     if (executor == null) {
                         final Sync sync = s.run(Spaceships.this);
+                        //System.err.println(i + " " + s.getVx() + ", " + s.getVy() + " " + s.getX() + ", " + s.getY() + " " + sb.getElement(s.getToken()).getBounds());
                         // sync.join();
                     } else {
                         executor.submit(new Runnable() {
@@ -265,7 +268,7 @@ public class Spaceships {
             millis = millis(start);
             if (timeStream != null)
                 timeStream.println(k + "," + millis + "," + millis1 + "," + millis0);
-            System.out.println("XXX: " + millis + " queue: " + sb.getQueueLength() + (executor != null ? " executorQueue: " + executor.getQueue().size() : ""));
+            System.out.println("XXX: " + millis + (executor != null ? " executorQueue: " + executor.getQueue().size() : ""));
         }
     }
 
