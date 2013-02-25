@@ -142,13 +142,12 @@ public abstract class Spaceship {
                     @Override
                     public Sync run(final Spaceships global) throws Exception {
                         final Spaceship self = this;
-                        return global.sb.queryForUpdate(SpatialQueries.range(global.sb.getElement(token).getBounds(), global.range), SpatialQueries.equals(global.sb.getElement(token)), new SpatialSetVisitor<Spaceship>() {
+                        return global.sb.queryForUpdate(SpatialQueries.range(getAABB(), global.range), SpatialQueries.equals((Spaceship) this, getAABB()), false, new SpatialSetVisitor<Spaceship>() {
+//                        return global.sb.queryForUpdate(SpatialQueries.range(global.sb.getElement(token).getBounds(), global.range), SpatialQueries.equals(global.sb.getElement(token)), false, new SpatialSetVisitor<Spaceship>() {
                             @Override
                             public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
                                 process(resultReadOnly);
 
-//                                if(resultForUpdate.size() != 1)
-//                                    Debug.exit(2);
                                 for (final ElementUpdater<Spaceship> updater : resultForUpdate) {
                                     assert updater.elem() == self; // Spaceship.this;
                                     move(global, global.currentTime());
@@ -167,7 +166,8 @@ public abstract class Spaceship {
 
                     @Override
                     public Sync run(final Spaceships global) throws Exception {
-                        return global.sb.queryForUpdate(SpatialQueries.range(getAABB(), global.range), SpatialQueries.equals(global.sb.getElement(token)), new SpatialSetVisitor<Spaceship>() {
+                        return global.sb.queryForUpdate(SpatialQueries.range(getAABB(), global.range), SpatialQueries.equals((Spaceship) this, getAABB()), false, new SpatialSetVisitor<Spaceship>() {
+//                        return global.sb.queryForUpdate(SpatialQueries.range(global.sb.getElement(token).getBounds(), global.range), SpatialQueries.equals(global.sb.getElement(token)), false, new SpatialSetVisitor<Spaceship>() {
                             @Override
                             public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
                                 process(resultReadOnly);
@@ -207,6 +207,7 @@ public abstract class Spaceship {
     private volatile int neighbors;
     protected SpatialToken token;
     private final AtomicInteger neighborCounter = new AtomicInteger();
+    private Sync sync;
 
     public Spaceship(Spaceships global) {
         if (global == null)
@@ -296,6 +297,15 @@ public abstract class Spaceship {
             assert !Double.isNaN(x + y);
         }
         this.lastMoved = currentTime;
+    }
+
+    public void setSync(Sync sync) {
+        this.sync = sync;
+    }
+
+    public void join() throws InterruptedException {
+        if (sync != null)
+            sync.join();
     }
 
     private void setVelocityDir(double direction, double speed) {

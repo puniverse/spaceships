@@ -172,7 +172,7 @@ public class Spaceships {
         else
             builder.setExecutor(SpaceBaseExecutors.concurrent(CLEANUP_THREADS));
 
-        builder.setQueueBackpressure(1000);
+        builder.setQueueBackpressure(200);
         builder.setContentionBackpressure(990);
         
         if (optimistic)
@@ -231,16 +231,18 @@ public class Spaceships {
                 for (int i = 0; i < N; i++) {
                     final Spaceship s = ships[i];
                     if (executor == null) {
-                        final Sync sync = s.run(Spaceships.this);
+                        s.join();
+                        Sync sync = s.run(Spaceships.this);
+                        s.setSync(sync);
                         //System.err.println(i + " " + s.getVx() + ", " + s.getVy() + " " + s.getX() + ", " + s.getY() + " " + sb.getElement(s.getToken()).getBounds());
-                        // sync.join();
                     } else {
                         executor.submit(new Runnable() {
                             @Override
                             public void run() {
                                 try {
-                                    final Sync sync = s.run(Spaceships.this);
-                                    // sync.join();
+                                    s.join();
+                                    Sync sync = s.run(Spaceships.this);
+                                    s.setSync(sync);
                                 } catch (Exception ex) {
                                     ex.printStackTrace();
                                     System.exit(1);
