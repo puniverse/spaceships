@@ -1,6 +1,21 @@
 /*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
+ * Copyright (C) 2013 Parallel Universe Software Co.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of
+ * this software and associated documentation files (the "Software"), to deal in
+ * the Software without restriction, including without limitation the rights to
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+ * the Software, and to permit persons to whom the Software is furnished to do so,
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+ * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+ * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+ * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 package co.paralleluniverse.spaceships;
 
@@ -24,7 +39,7 @@ import java.util.concurrent.TimeUnit;
  * @author pron
  */
 public abstract class Spaceship {
-    public static final int MAX_SHOOT_RANGE = 400;
+    public static final int MAX_SEARCH_RANGE = 400;
     public static final int TIMES_HITTED_TO_BLOW = 3;
     private static final double REJECTION_COEFF = 80000.0;
     private static final double SPEED_LIMIT = 100.0;
@@ -33,13 +48,16 @@ public abstract class Spaceship {
     public static final double HIT_RECOIL_VELOCITY = -100.0;
     public static final int BLAST_RANGE = 200;
     public static final int BLOW_TILL_DELETE_DURATION = 500;
-    public static final double SHOOT_PROBABLITY = 0.5;
+    public static final double SHOOT_PROBABLITY = 1;
     public static final int SHOOT_INABILITY_DURATION = 3000;
     private long lastMoved = -1L;
     private long shootTime = 0;
     private double shootLength = 10f;
     private int timesHitted = 0;
     private long blowTime = 0;
+    private SpatialToken lockedOn = null;
+    private double chaseAx;
+    private double chaseAy;
 
     public long getBlowTime() {
         return blowTime;
@@ -77,7 +95,7 @@ public abstract class Spaceship {
 
                         if (global.currentTime() - self.getTimeShot() > SHOOT_INABILITY_DURATION
                                 && random.nextFloat() < SHOOT_PROBABLITY)
-                            tryToShoot(self, global);
+                            searchForTargets(self, global);
 
                         return global.sb.queryForUpdate(SpatialQueries.range(getAABB(), global.range),
                                 SpatialQueries.equals(getAABB()), false, new SpatialSetVisitor<Spaceship>() {
@@ -148,7 +166,6 @@ public abstract class Spaceship {
     protected double vy;
     protected double ax;
     protected double ay;
-
     // external velocity (due to shoot or explostion hit, does not affect the heading)
     protected long exVelocityUpdated = 0;
     protected double exVx = 0;
@@ -188,6 +205,8 @@ public abstract class Spaceship {
                 processNeighbor(s, currentTime);
             }
         }
+        ax+=chaseAx;
+        ay+=chaseAy;
     }
 
     protected void process(Spaceship s, long currentTime) {
@@ -275,16 +294,17 @@ public abstract class Spaceship {
         reduceExAcc(currentTime);
     }
 
-    protected void tryToShoot(final Spaceship self, final Spaceships global) {
+    protected void searchForTargets(final Spaceship self, final Spaceships global) {
         double v = Math.sqrt(Math.pow(self.vx, 2) + Math.pow(self.vy, 2));
-        double x2 = self.x + self.vx / v * MAX_SHOOT_RANGE;
-        double y2 = self.y + self.vy / v * MAX_SHOOT_RANGE;
+        final double x2 = self.x + self.vx / v * MAX_SEARCH_RANGE;
+        final double y2 = self.y + self.vy / v * MAX_SEARCH_RANGE;
 
         global.sb.queryForUpdate(SpatialQueries.NONE_QUERY, new LineQuery<Spaceship>(x + 1, x2, y + 1, y2), false, new SpatialSetVisitor<Spaceship>() {
             @Override
             public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
                 ElementUpdater<Spaceship> closeShip = null;
-                double minRange2 = Math.pow(MAX_SHOOT_RANGE, 2);
+                ElementUpdater<Spaceship> lockedOnSpaceship = null;
+                double minRange2 = Math.pow(MAX_SEARCH_RANGE, 2);
                 for (ElementUpdater<Spaceship> eu : resultForUpdate) {
                     double rng2 = Math.pow(eu.elem().x - self.x, 2)
                             + Math.pow(eu.elem().y - self.y, 2);
@@ -292,15 +312,45 @@ public abstract class Spaceship {
                         minRange2 = rng2;
                         closeShip = eu;
                     }
-                    if (closeShip != null) {
-
+                    if (eu.elem().getToken() == lockedOn) {
+                        lockedOnSpaceship = eu;
+                    }
+                }
+                if (lockedOnSpaceship != null) {
+                    chase(lockedOnSpaceship.elem());
+                } else
+                    self.lock(null);
+                if (closeShip != null) {
+                    final double minRange = Math.sqrt(minRange2);
+                    if (minRange < 200 &&
+                            new LineQuery<Spaceship>(x + 1, x2, y + 1, y2).
+                            getDistance(closeShip.elem().x,closeShip.elem().y, self) < 1 &&
+                                    global.random.nextGaussian() < 0.001) {
                         self.shootTime = global.currentTime();
-                        self.shootLength = Math.sqrt(minRange2);
-                        eu.elem().shot(global, self);
+                        self.shootLength = minRange;
+                        closeShip.elem().shot(global, self);
+                    } else if (lockedOn == null) {
+                        self.lock(closeShip.elem().getToken());
+                        chase(lockedOnSpaceship.elem());
                     }
                 }
             }
         });
+    }
+
+    protected void chase(Spaceship s) {
+        final double dx = s.x - x;
+        final double dy = s.y - y;
+        double d = mag(dx, dy);
+        final double udx = dx / d;
+        final double udy = dy / d;
+
+        if (d < MIN_PROXIMITY)
+            d = MIN_PROXIMITY;
+        double acc = 400;
+        chaseAx = acc * udx;
+        chaseAy = acc * udy;
+
     }
 
     private void blast(Spaceships global, Spaceship hitted) {
@@ -376,5 +426,13 @@ public abstract class Spaceship {
 
     public long getShootTime() {
         return shootTime;
+    }
+
+    private void lock(SpatialToken token) {
+        lockedOn = token;
+        if (lockedOn == null) {
+            chaseAx = 0;
+            chaseAy = 0;
+        }
     }
 }
