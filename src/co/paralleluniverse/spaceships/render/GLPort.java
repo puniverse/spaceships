@@ -47,7 +47,6 @@ import java.io.InputStream;
 import java.nio.FloatBuffer;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.concurrent.TimeUnit;
 import javax.media.opengl.DebugGL3;
 import javax.media.opengl.GL;
 import javax.media.opengl.GL2ES2;
@@ -60,7 +59,6 @@ import javax.media.opengl.GLException;
 import javax.media.opengl.GLProfile;
 import javax.media.opengl.awt.GLCanvas;
 import javax.media.opengl.fixedfunc.GLMatrixFunc;
-import sun.nio.cs.ext.GB18030;
 
 /**
  * See:
@@ -255,24 +253,10 @@ public class GLPort implements GLEventListener {
 
         final GL3 gl = drawable.getGL().getGL3();
         try {
-            // This icon is under the LGPL license
-            // by Everaldo Coelho
-            InputStream stream = new FileInputStream("spaceship.png");
-            TextureData data = TextureIO.newTextureData(GLProfile.get(GLProfile.GL3), stream, false, "png");
-            spaceshipTex = TextureIO.newTexture(data);
-        } catch (IOException exc) {
-            exc.printStackTrace();
-            System.exit(1);
-        }
-        try {
-            // This icon is under the license "Creative Commons Attribution-Share Alike 3.0"
-            // by Christian "Crystan" Hoffmann
-            InputStream stream = new FileInputStream("explosion.png");
-            TextureData data = TextureIO.newTextureData(GLProfile.get(GLProfile.GL3), stream, false, "png");
-            explosionTex = TextureIO.newTexture(data);
-        } catch (IOException exc) {
-            exc.printStackTrace();
-            System.exit(1);
+            spaceshipTex = TextureIO.newTexture(TextureIO.newTextureData(GLProfile.get(GLProfile.GL3), new FileInputStream("spaceship.png"), false, "png"));
+            explosionTex = TextureIO.newTexture(TextureIO.newTextureData(GLProfile.get(GLProfile.GL3), new FileInputStream("explosion.png"), false, "png"));
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
         }
 
         drawableWidth = drawable.getWidth();
@@ -287,9 +271,9 @@ public class GLPort implements GLEventListener {
         gl.glEnable(GL.GL_BLEND);
         gl.glBlendFunc(GL.GL_ONE, GL.GL_ONE_MINUS_SRC_ALPHA);
 
-        ShaderCode vertexShader = ShaderCode.create(gl, gl.GL_VERTEX_SHADER, this.getClass(), "shader", null, "vertex", false);
-        ShaderCode geometryShader = ShaderCode.create(gl, gl.GL_GEOMETRY_SHADER, this.getClass(), "shader", null, "geometry", false);
-        ShaderCode fragmentShader = ShaderCode.create(gl, gl.GL_FRAGMENT_SHADER, this.getClass(), "shader", null, "fragment", false);
+        ShaderCode vertexShader = ShaderCode.create(gl, GL3.GL_VERTEX_SHADER, this.getClass(), "shader", null, "vertex", false);
+        ShaderCode geometryShader = ShaderCode.create(gl, GL3.GL_GEOMETRY_SHADER, this.getClass(), "shader", null, "geometry", false);
+        ShaderCode fragmentShader = ShaderCode.create(gl, GL3.GL_FRAGMENT_SHADER, this.getClass(), "shader", null, "fragment", false);
 
         if (!vertexShader.compile(gl, System.err))
             throw new GLException("Couldn't compile shader: " + vertexShader);
@@ -314,8 +298,8 @@ public class GLPort implements GLEventListener {
         this.vao = shaderState.createVAO(gl);
         vao.bind(gl);
 
-        this.vertices = new VBO(gl, 2, gl.GL_FLOAT, false, maxItems, gl.GL_DYNAMIC_DRAW);
-        this.colors = new VBO(gl, 3, gl.GL_FLOAT, false, maxItems, gl.GL_DYNAMIC_DRAW);
+        this.vertices = new VBO(gl, 2, GL3.GL_FLOAT, false, maxItems, GL3.GL_DYNAMIC_DRAW);
+        this.colors = new VBO(gl, 3, GL3.GL_FLOAT, false, maxItems, GL3.GL_DYNAMIC_DRAW);
 
         vao.setVertex(gl, "in_Position", vertices);
         vao.setVertex(gl, "in_Vertex", colors);
@@ -422,8 +406,8 @@ public class GLPort implements GLEventListener {
 
         shaderState.setUniform(gl, "in_Matrix", 4, 4, pmv.glGetMvMatrixf());
 
-        gl.glClear(gl.GL_COLOR_BUFFER_BIT);
-        gl.glDrawArrays(gl.GL_POINTS, 0, numElems);
+        gl.glClear(GL3.GL_COLOR_BUFFER_BIT);
+        gl.glDrawArrays(GL3.GL_POINTS, 0, numElems);
 
         vao.unbind(gl);
         shaderState.unbind(gl);
@@ -471,7 +455,6 @@ public class GLPort implements GLEventListener {
             portMinYAnimation += moveStep;
             portMaxYAnimation += moveStep;
         }
-//        portToMvMatrix(port);
     }
 
     private void scalePort(double units) {
@@ -502,15 +485,6 @@ public class GLPort implements GLEventListener {
                 portMinYAnimation -= heightToAdd;
             }
         }
-    }
-
-    private void print(FloatBuffer buffer) {
-        int pos = buffer.position();
-        System.err.print(buffer.remaining() + ": ");
-        while (buffer.position() < buffer.limit())
-            System.err.print(buffer.get() + ", ");
-        System.err.println();
-        buffer.position(pos);
     }
 
     public void myKeyPressed(int keyCode) {
@@ -647,4 +621,13 @@ public class GLPort implements GLEventListener {
         public void mouseDragged(com.jogamp.newt.event.MouseEvent e) {
         }
     }
+
+//    private void print(FloatBuffer buffer) {
+//        int pos = buffer.position();
+//        System.err.print(buffer.remaining() + ": ");
+//        while (buffer.position() < buffer.limit())
+//            System.err.print(buffer.get() + ", ");
+//        System.err.println();
+//        buffer.position(pos);
+//    }
 }
