@@ -114,7 +114,8 @@ public class Spaceship {
                     if (inShootRange(range, lockedSpaceship)) {
                         Spaceship.this.shoot(global,range);
                         updater.elem().shot(global, Spaceship.this);
-                    } else if (inLockRange(range, angularDiversion)) {
+                    }
+                    if (inLockRange(range, angularDiversion)) {
 //                        Spaceship.this.shoot(global, range);
                         chase(updater.elem());
                     } else
@@ -292,7 +293,8 @@ public class Spaceship {
         final double y2 = y + vy / v * MAX_SEARCH_RANGE;
 
         // search for targets in the line of shot
-        global.sb.query(new LineQuery<Spaceship>(x + 1, x2, y + 1, y2), new SpatialSetVisitor<Spaceship>() {
+//        global.sb.query(new LineQuery<Spaceship>(x + 1, x2, y + 1, y2), new SpatialSetVisitor<Spaceship>() {
+        global.sb.query(new RadarQuery(x, y, vx, vy, Math.toRadians(30), MAX_SEARCH_RANGE), new SpatialSetVisitor<Spaceship>() {
             @Override
             public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
                 // find closest ship along line of shot and check whether locked-on ship is still in range
@@ -322,7 +324,7 @@ public class Spaceship {
             d = MIN_PROXIMITY;
         final double udx = dx / d;
         final double udy = dy / d;
-        final double acc = 0;//400;
+        final double acc = 300;
         chaseAx = acc * udx;
         chaseAy = acc * udy;
     }
