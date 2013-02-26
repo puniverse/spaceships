@@ -42,7 +42,7 @@ import java.util.concurrent.TimeUnit;
 
 public class Spaceships {
     public static Spaceships spaceships;
-    public static final int POSTPONE_GLPORT_UNTIL_SB_CYCLE_UNDER_X_MILLIS = 500;
+    public static final int POSTPONE_GLPORT_UNTIL_SB_CYCLE_UNDER_X_MILLIS = 250;
 
     /**
      * @param args the command line arguments
@@ -88,7 +88,7 @@ public class Spaceships {
         this.parallel = Boolean.parseBoolean(props.getProperty("parallel", "false"));
         this.async = Boolean.parseBoolean(props.getProperty("async", "true"));
         double b = Double.parseDouble(props.getProperty("world-length", "20000"));
-        this.bounds = AABB.create(-b / 2, b / 2, -b / 2, b / 2, -b / 2, b / 2);
+        this.bounds = AABB.create(-b / 2, b / 2, -b / 2 * 0.7, b / 2 * 0.7, -b / 2, b / 2);
         this.N = Integer.parseInt(props.getProperty("N", "10000"));
         this.speedVariance = Double.parseDouble(props.getProperty("speed-variance", "1"));
         this.range = Double.parseDouble(props.getProperty("radar-range", "10"));
