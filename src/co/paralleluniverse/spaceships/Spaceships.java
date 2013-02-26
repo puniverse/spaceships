@@ -222,7 +222,6 @@ public class Spaceships {
 
         for (int k = 0;; k++) {
             cycleStart = System.nanoTime();
-            float millis1, millis;
 
             for (final Spaceship s : ships) {
                 final Runnable command = new Runnable() {
@@ -244,7 +243,7 @@ public class Spaceships {
                     executor.submit(command);
             }
 
-            millis = millis(cycleStart);
+            float millis = millis(cycleStart);
             if (timeStream != null)
                 timeStream.println(k + "," + millis);
 
