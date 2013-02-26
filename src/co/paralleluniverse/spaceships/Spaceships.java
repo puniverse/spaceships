@@ -262,7 +262,7 @@ public class Spaceships {
             if (port == null & millis < POSTPONE_GLPORT_TILLE_SB_CYCLE_UNDER_X_MILLIS)
                 port = new GLPort(toolkit, N, Spaceships.this, bounds);
 
-            System.out.println("XXX: " + millis + " queue: " + sb.getQueueLength() + (executor != null ? " executorQueue: " + executor.getQueue().size() : ""));
+            System.out.println("XXX: " + millis + (executor != null ? " executorQueue: " + executor.getQueue().size() : ""));
         }
     }
 

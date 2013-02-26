@@ -80,7 +80,7 @@ public abstract class Spaceship {
                             tryToShoot(self, global);
 
                         return global.sb.queryForUpdate(SpatialQueries.range(getAABB(), global.range),
-                                SpatialQueries.equals(getAABB()), new SpatialSetVisitor<Spaceship>() {
+                                SpatialQueries.equals(getAABB()), false, new SpatialSetVisitor<Spaceship>() {
                             @Override
                             public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
                                 process(resultReadOnly, global.currentTime());
@@ -280,7 +280,7 @@ public abstract class Spaceship {
         double x2 = self.x + self.vx / v * MAX_SHOOT_RANGE;
         double y2 = self.y + self.vy / v * MAX_SHOOT_RANGE;
 
-        global.sb.queryForUpdate(SpatialQueries.NONE_QUERY, new LineQuery<Spaceship>(x + 1, x2, y + 1, y2), new SpatialSetVisitor<Spaceship>() {
+        global.sb.queryForUpdate(SpatialQueries.NONE_QUERY, new LineQuery<Spaceship>(x + 1, x2, y + 1, y2), false, new SpatialSetVisitor<Spaceship>() {
             @Override
             public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
                 ElementUpdater<Spaceship> closeShip = null;
