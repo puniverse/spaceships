@@ -37,13 +37,11 @@ import com.jogamp.opengl.util.PMVMatrix;
 import com.jogamp.opengl.util.glsl.ShaderCode;
 import com.jogamp.opengl.util.glsl.ShaderProgram;
 import com.jogamp.opengl.util.texture.Texture;
-import com.jogamp.opengl.util.texture.TextureData;
 import com.jogamp.opengl.util.texture.TextureIO;
 import java.awt.Component;
 import java.awt.Frame;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.FloatBuffer;
 import java.util.Collection;
 import java.util.Collections;
@@ -74,7 +72,7 @@ public class GLPort implements GLEventListener {
     public static final double ZOOM_UNIT = 0.1;
     public static final int ANIMATION_DURATION = 200;
     public static final int SHOOT_DURATION = 100;
-    public static final float EXPLOSION_DURATION = 500f;
+    public static final float EXPLOSION_DURATION = 1000f;
     public static final int MAX_EXTRAPOLATION_DURATION = 1000;
     public static final int SB_QUERY_RATE = 200;
     public static final int WIDTH_MARGINS = 800;
@@ -372,6 +370,7 @@ public class GLPort implements GLEventListener {
             lastSBCycleStart = global.getCycleStart();
         }
         double[] pos;
+        int countInPort = 0;
         for (Object o : lastSBQueryResult) {
             Spaceship s = (Spaceship) o;
             if (s.getLastMoved() > 0) {
@@ -395,7 +394,10 @@ public class GLPort implements GLEventListener {
                 // put the shootLength (0 for ship wihout shoot)
                 colorsb.put(ct - s.getShootTime() < SHOOT_DURATION ? (float) s.getShootLength() : 0f);
             }
+            if (port.contains(s.getAABB()))
+                countInPort++;
         }
+        setTitle(""+countInPort+ " Spaceships " + (int)(port.max(X) - port.min(X)) + "x" + (int)(port.max(Y) - port.min(Y)) );            
 
         vertices.flip();
         colors.flip();
@@ -423,7 +425,6 @@ public class GLPort implements GLEventListener {
         drawableHeight = height;
         drawableWidth = width;
         portToMvMatrix(port);
-        setTitle("Spaceships " + (port.max(X) - port.min(X)) + "x" + (port.max(Y) - port.min(Y)));
     }
 
     private void movePort(boolean horizontal, double units) {
