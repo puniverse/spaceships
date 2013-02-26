@@ -17,7 +17,7 @@ import static org.junit.Assert.*;
  * @author eitan
  */
 public class LineQueryTest {
-        LineQuery<Object> lq;
+        LineDistanceQuery<Object> lq;
         public LineQueryTest() {
     }
     
@@ -44,7 +44,7 @@ public class LineQueryTest {
     @Test
     public void testSomeMethod() {
         int d = 5;
-        lq = new LineQuery<>(0,100,0,100);
+        lq = new LineDistanceQuery<>(0,100,0,100,10);
         for (int i=45+d; i<45-d+360; i++) {
             ae(false,50*Math.cos(Math.PI*i/180.0),50*Math.sin(Math.PI*i/180.0));
         }

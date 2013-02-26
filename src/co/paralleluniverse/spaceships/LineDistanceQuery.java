@@ -22,17 +22,14 @@ package co.paralleluniverse.spaceships;
 import co.paralleluniverse.spacebase.AABB;
 import co.paralleluniverse.spacebase.SpatialQuery;
 
-    class LineQuery<T> implements SpatialQuery<T> {
+    class LineDistanceQuery<T> implements SpatialQuery<T> {
     public static final int LINE_ACCURACY = 500;
         private AABB lineAABB;
         private double a, b, norm;
-        private double x0,x1,y0,y1;
+        private final double maxDist;
 
-        public LineQuery(double x0,double x1,double y0,double y1) {
-            this.x0 = x0;
-            this.x1 = x1;
-            this.y0 = y0;
-            this.y1 = y1;
+        public LineDistanceQuery(double x0,double x1,double y0,double y1, double dist) {
+            this.maxDist = dist;
             double minX, maxX, minY, maxY;
             if (x0 < x1) {
                 minX = x0;
@@ -66,7 +63,7 @@ import co.paralleluniverse.spacebase.SpatialQuery;
             if (!lineAABB.intersects(aabb))
                 return false;
             double dist = Math.abs(a * aabb.min(0) - aabb.min(1) + b) / norm;
-            if (dist<LINE_ACCURACY)
+            if (dist<this.maxDist)
                 return true;
             return false;
         }

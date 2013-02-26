@@ -148,10 +148,9 @@ public class Spaceship {
 
                 private boolean inShootRange(double range, Spaceship target) {
                     double v = mag(vx, vy);
-                    final double x2 = x + vx / v * MAX_SEARCH_RANGE;
-                    final double y2 = y + vy / v * MAX_SEARCH_RANGE;
-                    return (range < SHOOT_RANGE
-                            & new LineQuery<Spaceship>(x + 1, x2, y + 1, y2).getDistance(target.x, target.y, Spaceship.this) < SHOOT_ACCURACY);
+                    final double x2 = x + vx / v * SHOOT_RANGE;
+                    final double y2 = y + vy / v * SHOOT_RANGE;
+                    return (new LineDistanceQuery<Spaceship>(x + 1, x2, y + 1, y2,SHOOT_ACCURACY).queryElement(target.getAABB(), Spaceship.this));
                 }
             });
         }
@@ -294,7 +293,7 @@ public class Spaceship {
         debug(global, "searching...");
 
         // search for targets in the line of shot
-//        global.sb.query(new LineQuery<Spaceship>(x + 1, x2, y + 1, y2), new SpatialSetVisitor<Spaceship>() {
+//        global.sb.query(new LineDistanceQuery<Spaceship>(x + 1, x2, y + 1, y2), new SpatialSetVisitor<Spaceship>() {
         global.sb.query(new RadarQuery(x, y, vx, vy, Math.toRadians(30), MAX_SEARCH_RANGE), new SpatialSetVisitor<Spaceship>() {
             @Override
             public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
