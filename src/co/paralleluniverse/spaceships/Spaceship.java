@@ -100,7 +100,7 @@ public class Spaceship {
 
         // move based on nearby spacehips' positions
         return global.sb.queryForUpdate(SpatialQueries.range(getAABB(), global.range),
-                SpatialQueries.equals(getAABB()), false, new SpatialSetVisitor<Spaceship>() {
+                SpatialQueries.equals(this,getAABB()), false, new SpatialSetVisitor<Spaceship>() {
             @Override
             public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
                 process(resultReadOnly, global.currentTime());
@@ -145,8 +145,9 @@ public class Spaceship {
 
                 ax -= rejection * udx;
                 ay -= rejection * udy;
-
-                assert !Double.isNaN(ax + ay);
+                
+                if (Double.isNaN(ax + ay))
+                    assert false;
             }
         }
     }
@@ -284,12 +285,13 @@ public class Spaceship {
         final double dx = s.x - x;
         final double dy = s.y - y;
         final double d = mag(dx, dy);
-        final double udx = dx / d;
-        final double udy = dy / d;
-
-        final double acc = 400;
-        chaseAx = acc * udx;
-        chaseAy = acc * udy;
+        if (d>200) {
+            final double udx = dx / d;
+            final double udy = dy / d;
+            final double acc = 400;
+            chaseAx = acc * udx;
+            chaseAy = acc * udy;
+        }
     }
 
     /**
