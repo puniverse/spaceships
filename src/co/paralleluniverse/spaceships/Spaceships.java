@@ -43,6 +43,7 @@ import java.util.concurrent.TimeUnit;
 public class Spaceships {
     public static Spaceships spaceships;
     public static final int POSTPONE_GLPORT_UNTIL_SB_CYCLE_UNDER_X_MILLIS = 250;
+    private static final int MAX_PORT_POSTPONE_MILLIS = 10000;
 
     /**
      * @param args the command line arguments
@@ -214,7 +215,8 @@ public class Spaceships {
             }
             System.out.println("Inserted " + N + " things in " + millis(insrertStart));
         }
-
+        long initTime = System.nanoTime();
+        
         if (timeStream != null)
             timeStream.println("# time, millis, millis1, millis0");
 
@@ -252,7 +254,9 @@ public class Spaceships {
 
             millis = millis(cycleStart);
 
-            if (port == null & millis < POSTPONE_GLPORT_UNTIL_SB_CYCLE_UNDER_X_MILLIS) // wait for JIT to make everything run smoothly before opening port
+            if (port == null & 
+                    (millis < POSTPONE_GLPORT_UNTIL_SB_CYCLE_UNDER_X_MILLIS
+                    | millis(initTime) > MAX_PORT_POSTPONE_MILLIS)) // wait for JIT to make everything run smoothly before opening port
                 port = new GLPort(toolkit, N, Spaceships.this, bounds);
 
             System.out.println("CYCLE: " + millis + " millis " + (executor != null && executor instanceof ThreadPoolExecutor ? " executorQueue: " + ((ThreadPoolExecutor) executor).getQueue().size() : ""));

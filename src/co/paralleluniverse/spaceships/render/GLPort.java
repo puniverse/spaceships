@@ -74,7 +74,7 @@ public class GLPort implements GLEventListener {
     public static final int SHOOT_DURATION = 100;
     public static final float EXPLOSION_DURATION = 1000f;
     public static final int MAX_EXTRAPOLATION_DURATION = 1000;
-    public static final int SB_QUERY_RATE = 200;
+    public static final int SB_QUERY_RATE = 250;
     public static final int WIDTH_MARGINS = 800;
     public static final int MAX_PORT_WIDTH = 400;
     public static final String WINDOW_TITLE = "Spaceships";

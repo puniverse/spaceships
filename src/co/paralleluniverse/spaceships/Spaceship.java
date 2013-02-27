@@ -198,7 +198,7 @@ public class Spaceship {
                 final double udx = dx / d;
                 final double udy = dy / d;
 
-                double rejection = Math.min(REJECTION_COEFF / (d * d), 150);
+                double rejection = Math.min(REJECTION_COEFF / (d * d), 250);
 
                 ax -= rejection * udx;
                 ay -= rejection * udy;
