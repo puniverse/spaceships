@@ -19,13 +19,13 @@
  */
 package co.paralleluniverse.spaceships;
 
+import co.paralleluniverse.db.tree.Sync;
 import co.paralleluniverse.spacebase.AABB;
 import co.paralleluniverse.spacebase.MutableAABB;
 import co.paralleluniverse.spacebase.SpaceBase;
 import co.paralleluniverse.spacebase.SpaceBaseBuilder;
 import co.paralleluniverse.spacebase.SpaceBaseExecutors;
 import co.paralleluniverse.spacebase.SpatialToken;
-import co.paralleluniverse.spacebase.Sync;
 import co.paralleluniverse.spaceships.render.GLPort;
 import java.io.File;
 import java.io.FileNotFoundException;
