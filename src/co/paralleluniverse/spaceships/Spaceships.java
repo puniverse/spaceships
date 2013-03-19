@@ -4,8 +4,9 @@
  */
 package co.paralleluniverse.spaceships;
 
+import co.paralleluniverse.db.tree.Sync;
+import co.paralleluniverse.db.util.Debug;
 import co.paralleluniverse.spacebase.AABB;
-import co.paralleluniverse.spacebase.Debug;
 import co.paralleluniverse.spacebase.ElementUpdater;
 import co.paralleluniverse.spacebase.MutableAABB;
 import co.paralleluniverse.spacebase.SpaceBase;
@@ -16,7 +17,6 @@ import co.paralleluniverse.spacebase.SpatialModifyingVisitor;
 import co.paralleluniverse.spacebase.SpatialQueries;
 import co.paralleluniverse.spacebase.SpatialSetVisitor;
 import co.paralleluniverse.spacebase.SpatialToken;
-import co.paralleluniverse.spacebase.Sync;
 import co.paralleluniverse.spaceships.render.GLPort;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -118,6 +118,8 @@ public class Spaceships {
         println("===== MODE: " + mode + ": " + Spaceship.description(mode) + " =======");
         println("World bounds: " + bounds);
         println("N: " + N);
+        if(metricsDir != null)
+            println("Writing metrics to " + metricsDir);
 
         if (!parallel) {
             final int numThreads = Integer.parseInt(props.getProperty("parallelism", "2")) - CLEANUP_THREADS;
@@ -173,7 +175,7 @@ public class Spaceships {
             builder.setExecutor(SpaceBaseExecutors.concurrent(CLEANUP_THREADS));
 
         builder.setQueueBackpressure(200);
-        builder.setContentionBackpressure(990);
+        //builder.setContentionBackpressure(990);
         
         if (optimistic)
             builder.setOptimisticLocking(optimisticHeight, optimisticRetryLimit);
@@ -185,7 +187,7 @@ public class Spaceships {
         builder.setSinglePrecision(singlePrecision).setCompressed(compressed);
         builder.setNodeWidth(nodeWidth);
 
-        builder.setMonitoringType(SpaceBaseBuilder.MonitorType.JMX);
+        builder.setMonitoringType(SpaceBaseBuilder.MonitorType.METRICS);
         if (metricsDir != null)
             com.yammer.metrics.reporting.CsvReporter.enable(metricsDir, 1, TimeUnit.SECONDS);
 
