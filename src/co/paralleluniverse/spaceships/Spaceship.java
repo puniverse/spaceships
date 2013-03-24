@@ -19,7 +19,9 @@
  */
 package co.paralleluniverse.spaceships;
 
-import co.paralleluniverse.db.tree.Sync;
+import co.paralleluniverse.db.api.Sync;
+import co.paralleluniverse.db.api.Syncs;
+import co.paralleluniverse.db.util.Debug;
 import co.paralleluniverse.spacebase.AABB;
 import static co.paralleluniverse.spacebase.AABB.X;
 import static co.paralleluniverse.spacebase.AABB.Y;
@@ -29,6 +31,8 @@ import co.paralleluniverse.spacebase.SpatialModifyingVisitor;
 import co.paralleluniverse.spacebase.SpatialQueries;
 import co.paralleluniverse.spacebase.SpatialSetVisitor;
 import co.paralleluniverse.spacebase.SpatialToken;
+import com.yammer.metrics.Metrics;
+import com.yammer.metrics.core.Meter;
 import static java.lang.Math.cos;
 import static java.lang.Math.sin;
 import java.util.Set;
@@ -39,7 +43,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class Spaceship {
     private static final int MAX_SEARCH_RANGE = 400;
-    private static final int TIMES_HITTED_TO_BLOW = 3;
+    private static final int TIMES_HITTED_TO_BLOW = 30000;
     private static final double REJECTION_COEFF = 80000.0;
     private static final double SPEED_LIMIT = 100.0;
     private static final double SPEED_BOUNCE_DAMPING = 0.9;
@@ -49,6 +53,12 @@ public class Spaceship {
     private static final int BLOW_TILL_DELETE_DURATION = 1000;
     private static final double SEARCH_PROBABLITY = 0.02;
     private static final int SHOOT_INABILITY_DURATION = 3000;
+    //
+//    private static final Meter spaceshipRun = Metrics.newMeter(Spaceship.class, "spaceshipRun", "call", TimeUnit.SECONDS);
+//    private static final Meter chaseUpdates = Metrics.newMeter(Spaceship.class, "chaseUpdates", "update", TimeUnit.SECONDS);
+//    private static final Meter moveQueryForUpdate = Metrics.newMeter(Spaceship.class, "moveQueryForUpdate", "queryForUpdate", TimeUnit.SECONDS);
+//    private static final Meter searchForTargetsQuery = Metrics.newMeter(Spaceship.class, "searchForTargetsQuery", "query", TimeUnit.SECONDS);
+//    private static final Meter blowupQueryForUpdate = Metrics.newMeter(Spaceship.class, "blowupQueryForUpdate", "queryForUpdate", TimeUnit.SECONDS);
     //
     private SpatialToken token;
     private Sync sync;
@@ -87,23 +97,25 @@ public class Spaceship {
     }
 
     public Sync run(final Spaceships global) {
+//        mark(spaceshipRun);
         final RandSpatial random = global.random;
 
         if (blowTime > 0) { // if i'm being being blown up
-            debug(global,"blow");
+            debug(global, "blow");
             if (global.currentTime() - blowTime > BLOW_TILL_DELETE_DURATION)
                 global.deleteSpaceship(this); // explosion has finished
             return Sync.DONE;
         }
 
+        Sync s1 = Sync.DONE;
         if (lockedOn == null) {
-            debug(global,"no lock");
+            debug(global, "no lock");
             if (global.currentTime() - getTimeShot() > SHOOT_INABILITY_DURATION && random.nextFloat() < SEARCH_PROBABLITY)
-                searchForTargets(global);
+                s1 = searchForTargets(global);
         } else {
-            debug(global,"locked");
+            debug(global, "locked");
             // check lock range, chase, shoot
-            global.sb.update(lockedOn, new SpatialModifyingVisitor<Spaceship>() {
+            s1 = global.sb.update(lockedOn, new SpatialModifyingVisitor<Spaceship>() {
                 private static final int SHOOT_RANGE = 200;
                 private static final int SHOOT_ACCURACY = 10;
                 private static final double SHOOT_PROBABLITY = 0.2;
@@ -111,27 +123,28 @@ public class Spaceship {
 
                 @Override
                 public void visit(ElementUpdater<Spaceship> updater) {
+//                    mark(chaseUpdates);
                     foundLockedOn = true;
                     Spaceship lockedSpaceship = updater.elem();
                     double range = mag(lockedSpaceship.x - x, lockedSpaceship.y - y);
                     double angularDiversion = Math.abs(
                             Math.atan2(lockedSpaceship.vx, lockedSpaceship.vy)
                             - getCurrentHeading(shootTime));
-                    if (lockedSpaceship.getBlowTime()!=0) {
+                    if (lockedSpaceship.getBlowTime() != 0) {
                         lock(null);
                         return;
                     }
                     if (inShootRange(range, lockedSpaceship) & global.random.nextGaussian() < SHOOT_PROBABLITY) {
-                        debug(global,"shootrange");
-                        Spaceship.this.shoot(global,range);
+                        debug(global, "shootrange");
+                        Spaceship.this.shoot(global, range);
                         updater.elem().shot(global, Spaceship.this);
                     }
                     if (inLockRange(lockedSpaceship)) {
-                        debug(global,"lockrange");
+                        debug(global, "lockrange");
 //                        Spaceship.this.shoot(global, range);
                         chase(updater.elem());
                     } else {
-                        debug(global,"release lock");                        
+                        debug(global, "release lock");
                         lock(null);  // not in range, release lock
                     }
                 }
@@ -150,16 +163,17 @@ public class Spaceship {
                     double v = mag(vx, vy);
                     final double x2 = x + vx / v * SHOOT_RANGE;
                     final double y2 = y + vy / v * SHOOT_RANGE;
-                    return (new LineDistanceQuery<Spaceship>(x + 1, x2, y + 1, y2,SHOOT_ACCURACY).queryElement(target.getAABB(), Spaceship.this));
+                    return (new LineDistanceQuery<Spaceship>(x + 1, x2, y + 1, y2, SHOOT_ACCURACY).queryElement(target.getAABB(), Spaceship.this));
                 }
             });
         }
 
         // move based on nearby spacehips' positions
-        return global.sb.queryForUpdate(SpatialQueries.range(getAABB(), global.range),
+        Sync s2 = global.sb.queryForUpdate(SpatialQueries.range(getAABB(), global.range),
                 SpatialQueries.equals(this, getAABB()), false, new SpatialSetVisitor<Spaceship>() {
             @Override
             public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
+//                mark(moveQueryForUpdate);
                 process(resultReadOnly, global.currentTime());
 
                 assert resultForUpdate.size() <= 1;
@@ -171,6 +185,7 @@ public class Spaceship {
                 }
             }
         });
+        return Syncs.combine(s1, s2);
     }
 
     /**
@@ -286,7 +301,7 @@ public class Spaceship {
      *
      * @param global
      */
-    private void searchForTargets(final Spaceships global) {
+    private Sync searchForTargets(final Spaceships global) {
         double v = Math.sqrt(Math.pow(vx, 2) + Math.pow(vy, 2));
         final double x2 = x + vx / v * MAX_SEARCH_RANGE;
         final double y2 = y + vy / v * MAX_SEARCH_RANGE;
@@ -294,9 +309,10 @@ public class Spaceship {
 
         // search for targets in the line of shot
 //        global.sb.query(new LineDistanceQuery<Spaceship>(x + 1, x2, y + 1, y2), new SpatialSetVisitor<Spaceship>() {
-        global.sb.query(new RadarQuery(x, y, vx, vy, Math.toRadians(30), MAX_SEARCH_RANGE), new SpatialSetVisitor<Spaceship>() {
+        return global.sb.query(new RadarQuery(x, y, vx, vy, Math.toRadians(30), MAX_SEARCH_RANGE), new SpatialSetVisitor<Spaceship>() {
             @Override
             public void visit(Set<Spaceship> resultReadOnly, Set<ElementUpdater<Spaceship>> resultForUpdate) {
+//                mark(searchForTargetsQuery);
                 // find closest ship along line of shot and check whether locked-on ship is still in range
                 Spaceship closeShip = null;
                 double minRange2 = Math.pow(MAX_SEARCH_RANGE, 2);
@@ -309,7 +325,7 @@ public class Spaceship {
                 }
                 if (closeShip != null)
                     lock(closeShip.getToken());
-                debug(global, "size of radar query "+resultReadOnly.size());
+                debug(global, "size of radar query " + resultReadOnly.size());
             }
         });
     }
@@ -353,11 +369,13 @@ public class Spaceship {
             exVy += HIT_RECOIL_VELOCITY * udy;
             this.exVelocityUpdated = timeShot;
         } else if (blowTime == 0) {
+            blowTime = global.currentTime();
             // I'm dead: blow up. The explosion pushes away all nearby ships.
             global.sb.queryForUpdate(SpatialQueries.range(getAABB(), BLAST_RANGE),
                     new SpatialModifyingVisitor<Spaceship>() {
                         @Override
                         public void visit(ElementUpdater<Spaceship> updater) {
+//                            mark(blowupQueryForUpdate);
                             updater.elem().blast(global, Spaceship.this);
                         }
 
@@ -365,7 +383,6 @@ public class Spaceship {
                         public void done() {
                         }
                     });
-            blowTime = global.currentTime();
         }
     }
 
@@ -473,14 +490,25 @@ public class Spaceship {
     }
 
     public void join() throws InterruptedException {
-        if (sync != null)
+        if (sync != null) {
             sync.join();
+//            if (!sync.join(3000, TimeUnit.MILLISECONDS)) {
+//                System.err.println("XXXXXXXXX Job: " + sync);
+//                Debug.exit(1);
+//            }
+        }
     }
 
     private void shoot(Spaceships global, double range) {
         shootTime = global.currentTime();
         shootLength = range;
     }
+
+    private static void mark(Meter meter) {
+        if (meter != null)
+            meter.mark();
+    }
+
     private void debug(Spaceships global, String s) {
 //        if(global.getShips().get(0)==this) {
 //            System.out.println(s);

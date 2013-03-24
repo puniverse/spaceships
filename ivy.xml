@@ -8,7 +8,7 @@
         <conf name="runtime-test" extends="compile-test"/>
     </configurations>
     <dependencies>
-        <dependency org="com.yammer.metrics" name="metrics-core" rev="2.0.2" conf="compile->default,javadoc(*),sources(*)" />
+        <dependency org="com.yammer.metrics" name="metrics-core" rev="2.2.0" conf="compile->default,javadoc(*),sources(*)" />
         <dependency org="net.sf.trove4j"     name="trove4j"      rev="3.0.2" conf="compile->default,javadoc(*),sources(*); runtime->default" />
         <dependency org="java3d"     name="vecmath"      rev="1.3.1" conf="compile->default,javadoc(*),sources(*); runtime->default" />
 

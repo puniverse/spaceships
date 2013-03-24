@@ -19,7 +19,7 @@
  */
 package co.paralleluniverse.spaceships;
 
-import co.paralleluniverse.db.tree.Sync;
+import co.paralleluniverse.db.api.Sync;
 import co.paralleluniverse.spacebase.AABB;
 import co.paralleluniverse.spacebase.MutableAABB;
 import co.paralleluniverse.spacebase.SpaceBase;
@@ -119,7 +119,7 @@ public class Spaceships {
      */
     private ExecutorService createThreadPool(Properties props) throws NumberFormatException {
         final int numThreads = Integer.parseInt(props.getProperty("parallelism", "2")) - CLEANUP_THREADS;
-        return new ThreadPoolExecutor(numThreads, numThreads, 0L, TimeUnit.MILLISECONDS, new SynchronousQueue<Runnable>(), new RejectedExecutionHandler() {
+        return new ThreadPoolExecutor(numThreads, numThreads, 1000L, TimeUnit.MILLISECONDS, new SynchronousQueue<Runnable>(), new RejectedExecutionHandler() {
             @Override
             public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
                 try {
@@ -193,11 +193,14 @@ public class Spaceships {
 
         builder.setSinglePrecision(singlePrecision).setCompressed(compressed);
         builder.setNodeWidth(nodeWidth);
-
-        builder.setMonitoringType(SpaceBaseBuilder.MonitorType.JMX);
-        if (metricsDir != null)
+        
+        builder.setMonitoringType(SpaceBaseBuilder.MonitorType.METRICS);
+        
+        if (metricsDir != null && builder.getMonitoringType() == SpaceBaseBuilder.MonitorType.METRICS) {
             com.yammer.metrics.reporting.CsvReporter.enable(metricsDir, 1, TimeUnit.SECONDS);
-
+                println("Writing metrics to " + metricsDir);
+        }
+        
         final SpaceBase<Spaceship> space = builder.build("base1");
         return space;
     }
@@ -216,7 +219,7 @@ public class Spaceships {
             System.out.println("Inserted " + N + " things in " + millis(insrertStart));
         }
         long initTime = System.nanoTime();
-        
+
         if (timeStream != null)
             timeStream.println("# time, millis, millis1, millis0");
 
@@ -254,8 +257,8 @@ public class Spaceships {
 
             millis = millis(cycleStart);
 
-            if (port == null & 
-                    (millis < POSTPONE_GLPORT_UNTIL_SB_CYCLE_UNDER_X_MILLIS
+            if (port == null
+                    & (millis < POSTPONE_GLPORT_UNTIL_SB_CYCLE_UNDER_X_MILLIS
                     | millis(initTime) > MAX_PORT_POSTPONE_MILLIS)) // wait for JIT to make everything run smoothly before opening port
                 port = new GLPort(toolkit, N, Spaceships.this, bounds);
 
