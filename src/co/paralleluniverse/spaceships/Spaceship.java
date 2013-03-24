@@ -4,7 +4,7 @@
  */
 package co.paralleluniverse.spaceships;
 
-import co.paralleluniverse.db.tree.Sync;
+import co.paralleluniverse.db.api.Sync;
 import co.paralleluniverse.spacebase.AABB;
 import static co.paralleluniverse.spacebase.AABB.X;
 import static co.paralleluniverse.spacebase.AABB.Y;
