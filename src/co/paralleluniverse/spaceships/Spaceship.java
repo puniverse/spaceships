@@ -21,7 +21,6 @@ package co.paralleluniverse.spaceships;
 
 import co.paralleluniverse.db.api.Sync;
 import co.paralleluniverse.db.api.Syncs;
-import co.paralleluniverse.db.util.Debug;
 import co.paralleluniverse.spacebase.AABB;
 import static co.paralleluniverse.spacebase.AABB.X;
 import static co.paralleluniverse.spacebase.AABB.Y;
@@ -31,7 +30,6 @@ import co.paralleluniverse.spacebase.SpatialModifyingVisitor;
 import co.paralleluniverse.spacebase.SpatialQueries;
 import co.paralleluniverse.spacebase.SpatialSetVisitor;
 import co.paralleluniverse.spacebase.SpatialToken;
-import com.yammer.metrics.Metrics;
 import com.yammer.metrics.core.Meter;
 import static java.lang.Math.cos;
 import static java.lang.Math.sin;
