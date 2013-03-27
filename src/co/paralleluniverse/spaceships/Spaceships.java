@@ -4,6 +4,7 @@
  */
 package co.paralleluniverse.spaceships;
 
+import co.paralleluniverse.db.api.DbExecutors;
 import co.paralleluniverse.db.api.Sync;
 import co.paralleluniverse.db.util.Debug;
 import co.paralleluniverse.spacebase.AABB;
@@ -11,7 +12,6 @@ import co.paralleluniverse.spacebase.ElementUpdater;
 import co.paralleluniverse.spacebase.MutableAABB;
 import co.paralleluniverse.spacebase.SpaceBase;
 import co.paralleluniverse.spacebase.SpaceBaseBuilder;
-import co.paralleluniverse.spacebase.SpaceBaseExecutors;
 import co.paralleluniverse.spacebase.SpatialJoinVisitor;
 import co.paralleluniverse.spacebase.SpatialModifyingVisitor;
 import co.paralleluniverse.spacebase.SpatialQueries;
@@ -170,9 +170,9 @@ public class Spaceships {
         SpaceBaseBuilder builder = new SpaceBaseBuilder();
 
         if (parallel)
-            builder.setExecutor(SpaceBaseExecutors.parallel(parallelism));
+            builder.setExecutor(DbExecutors.parallel(parallelism));
         else
-            builder.setExecutor(SpaceBaseExecutors.concurrent(CLEANUP_THREADS));
+            builder.setExecutor(DbExecutors.concurrent(CLEANUP_THREADS));
 
         builder.setQueueBackpressure(200);
         //builder.setContentionBackpressure(990);
