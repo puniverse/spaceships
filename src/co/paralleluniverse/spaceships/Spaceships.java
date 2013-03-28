@@ -4,9 +4,9 @@
  */
 package co.paralleluniverse.spaceships;
 
+import co.paralleluniverse.common.util.Debug;
 import co.paralleluniverse.db.api.DbExecutors;
 import co.paralleluniverse.db.api.Sync;
-import co.paralleluniverse.db.util.Debug;
 import co.paralleluniverse.spacebase.AABB;
 import co.paralleluniverse.spacebase.ElementUpdater;
 import co.paralleluniverse.spacebase.MutableAABB;
@@ -15,7 +15,6 @@ import co.paralleluniverse.spacebase.SpaceBaseBuilder;
 import co.paralleluniverse.spacebase.SpatialJoinVisitor;
 import co.paralleluniverse.spacebase.SpatialModifyingVisitor;
 import co.paralleluniverse.spacebase.SpatialQueries;
-import co.paralleluniverse.spacebase.SpatialSetVisitor;
 import co.paralleluniverse.spacebase.SpatialToken;
 import co.paralleluniverse.spaceships.render.GLPort;
 import java.io.File;
@@ -23,7 +22,6 @@ import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.PrintStream;
 import java.util.Properties;
-import java.util.Set;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
