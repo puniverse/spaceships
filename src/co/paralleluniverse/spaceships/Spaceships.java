@@ -4,6 +4,7 @@
  */
 package co.paralleluniverse.spaceships;
 
+import co.paralleluniverse.common.monitoring.MonitorType;
 import co.paralleluniverse.common.util.Debug;
 import co.paralleluniverse.db.api.DbExecutors;
 import co.paralleluniverse.db.api.Sync;
@@ -185,8 +186,8 @@ public class Spaceships {
         builder.setSinglePrecision(singlePrecision).setCompressed(compressed);
         builder.setNodeWidth(nodeWidth);
 
-        builder.setMonitoringType(SpaceBaseBuilder.MonitorType.JMX);
-        if (builder.getMonitoringType() == SpaceBaseBuilder.MonitorType.METRICS && metricsDir != null)
+        builder.setMonitoringType(MonitorType.JMX);
+        if (builder.getMonitoringType() == MonitorType.METRICS && metricsDir != null)
             com.yammer.metrics.reporting.CsvReporter.enable(metricsDir, 1, TimeUnit.SECONDS);
 
         final SpaceBase<Spaceship> space = builder.build("base1");
